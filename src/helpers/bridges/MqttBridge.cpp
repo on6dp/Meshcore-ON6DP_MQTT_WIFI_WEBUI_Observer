@@ -2,10 +2,11 @@
 
 #ifdef WITH_MQTT_BRIDGE
 
-#include "base64.hpp"  // densaugeo/base64 - real API: encode_base64_length(), encode_base64()
+// Note: base64.hpp no longer needed here - the raw packet payload is now
+// sent as hex, not base64 (see publish() below).
 
 MqttBridge::MqttBridge(NodePrefs *prefs, mesh::PacketManager *mgr, mesh::RTCClock *rtc)
-    : BridgeBase(prefs, mgr, rtc), _mqtt(_wifiClient) {}
+    : BridgeBase(prefs, mgr, rtc), _mqtt(_wifiClient), _node_prefs(prefs) {}
 
 void MqttBridge::loadSettings() {
   _store.begin("mqttcfg", false);  // read-write namespace in NVS
@@ -102,7 +103,26 @@ void MqttBridge::loop() {
 
   if (ensureConnected()) {
     _mqtt.loop();
+
+    uint32_t now = millis();
+    if (now - _last_status_publish > 60000) {  // every 60s
+      _last_status_publish = now;
+      publishStatus();
+    }
   }
+}
+
+void MqttBridge::publishStatus() {
+  char topic[80];
+  snprintf(topic, sizeof(topic), "meshcore/%s/%s/status", MQTT_STATUS_REGION, MQTT_CLIENT_ID);
+
+  char json[220];
+  snprintf(json, sizeof(json),
+           "{\"status\":\"online\",\"origin\":\"%s\",\"origin_id\":\"%s\",\"client_version\":\"on6dp-heltec-v4\"}",
+           _node_prefs->node_name, MQTT_CLIENT_ID);
+
+  bool ok = _mqtt.publish(topic, json);
+  Serial.printf("MqttBridge: status published to %s, ok=%d\n", topic, (int)ok);
 }
 
 static void toHexHash(const uint8_t *hash, int len, char *out) {
@@ -121,32 +141,34 @@ void MqttBridge::publish(mesh::Packet *packet, const char *dir, float score, int
   int raw_len = packet->writeTo(raw);
   if (raw_len <= 0) return;
 
-  unsigned int b64_len = encode_base64_length(raw_len);
-  unsigned char *b64 = (unsigned char *)malloc(b64_len + 1);  // +1 for null terminator
-  if (!b64) return;
-  encode_base64(raw, raw_len, b64);
+  // CoreScope's ingestor expects the raw packet bytes as hex, not base64
+  // (confirmed via its own "decode error: invalid hex" log message) -
+  // toHexHash() below works for any byte array, not just hashes.
+  char *raw_hex = (char *)malloc(raw_len * 2 + 1);
+  if (!raw_hex) return;
+  toHexHash(raw, raw_len, raw_hex);
 
   uint8_t hash[MAX_HASH_SIZE];
   packet->calculatePacketHash(hash);
   char hash_hex[MAX_HASH_SIZE * 2 + 1];
   toHexHash(hash, MAX_HASH_SIZE, hash_hex);
 
-  // JSON buffer sized generously for a base64 payload up to MAX_TRANS_UNIT+1 bytes
-  unsigned int json_size = b64_len + 256;
+  // JSON buffer sized generously for a hex payload (2 chars/byte) up to MAX_TRANS_UNIT+1 bytes
+  unsigned int json_size = (raw_len * 2) + 256;
   char *json = (char *)malloc(json_size);
   if (json) {
     snprintf(json, json_size,
              "{\"dir\":\"%s\",\"type\":%d,\"route\":\"%s\",\"payload_len\":%d,"
              "\"snr\":%d,\"rssi\":%d,\"score\":%d,\"hash\":\"%s\",\"raw\":\"%s\"}",
              dir, packet->getPayloadType(), packet->isRouteDirect() ? "D" : "F", packet->payload_len,
-             (int)packet->getSNR(), rssi, (int)(score * 1000), hash_hex, (char *)b64);
+             (int)packet->getSNR(), rssi, (int)(score * 1000), hash_hex, raw_hex);
 
     bool ok = _mqtt.publish(_topic.c_str(), json);
     Serial.printf("MqttBridge: publish %s at t=%lu ms, json_len=%d, ok=%d, state=%d\n",
                   dir, millis(), (int)strlen(json), (int)ok, _mqtt.state());
     free(json);
   }
-  free(b64);
+  free(raw_hex);
 }
 
 void MqttBridge::publishRx(mesh::Packet *packet, int len, float score, int rssi) {

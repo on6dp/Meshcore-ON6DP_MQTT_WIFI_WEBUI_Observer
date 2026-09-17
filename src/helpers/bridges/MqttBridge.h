@@ -20,6 +20,9 @@
 #ifndef MQTT_CLIENT_ID
   #define MQTT_CLIENT_ID "meshcore-observer"
 #endif
+#ifndef MQTT_STATUS_REGION
+  #define MQTT_STATUS_REGION "BE"
+#endif
 
 /**
  * @brief Bridge implementation that publishes observed mesh packets to an MQTT
@@ -69,14 +72,21 @@ private:
   WiFiClient _wifiClient;
   PubSubClient _mqtt;
   Preferences _store;
+  NodePrefs *_node_prefs;
   String _server;
   int _port;
   String _topic;
   uint32_t _last_reconnect_attempt = 0;
+  uint32_t _last_status_publish = 0;
 
   void loadSettings();
   bool ensureConnected();
   void publish(mesh::Packet *packet, const char *dir, float score, int rssi);
+  // Publishes a "presence" message on meshcore/<region>/<client_id>/status,
+  // in the same style used by KiekR and other observers - this is what
+  // makes this device show up as a named entry in CoreScope's Observers
+  // tab, instead of just contributing raw packet data anonymously.
+  void publishStatus();
 };
 
 #endif
