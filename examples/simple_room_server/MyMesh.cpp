@@ -226,6 +226,9 @@ void MyMesh::logRxRaw(float snr, float rssi, const uint8_t raw[], int len) {
 }
 
 void MyMesh::logRx(mesh::Packet *pkt, int len, float score) {
+#if defined(WITH_MQTT_BRIDGE)
+  bridge.publishRx(pkt, len, score, (int)_radio->getLastRSSI());
+#endif
   if (_logging) {
     File f = openAppend(PACKET_LOG_FILE);
     if (f) {
@@ -245,6 +248,9 @@ void MyMesh::logRx(mesh::Packet *pkt, int len, float score) {
   }
 }
 void MyMesh::logTx(mesh::Packet *pkt, int len) {
+#if defined(WITH_MQTT_BRIDGE)
+  bridge.sendPacket(pkt);
+#endif
   if (_logging) {
     File f = openAppend(PACKET_LOG_FILE);
     if (f) {
@@ -626,13 +632,15 @@ void MyMesh::onAckRecv(mesh::Packet *packet, uint32_t ack_crc) {
     packet->markDoNotRetransmit(); // ACK was for this node, so don't retransmit
   }
 }
-
 MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondClock &ms, mesh::RNG &rng,
                mesh::RTCClock &rtc, mesh::MeshTables &tables)
     : mesh::Mesh(radio, ms, rng, rtc, *new StaticPoolPacketManager(32), tables),
       region_map(key_store), temp_map(key_store),
       _cli(board, rtc, sensors, region_map, acl, &_prefs, this),
       telemetry(MAX_PACKET_PAYLOAD - 4)
+#if defined(WITH_MQTT_BRIDGE)
+      , bridge(&_prefs, _mgr, &rtc)
+#endif
 {
   last_millis = 0;
   uptime_millis = 0;
@@ -657,7 +665,7 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
   _prefs.bw = LORA_BW;
   _prefs.cr = LORA_CR;
   _prefs.tx_power_dbm = LORA_TX_POWER;
-  _prefs.disable_fwd = 1;
+  _prefs.disable_fwd = 0;
   _prefs.advert_interval = 1;        // default to 2 minutes for NEW installs
   _prefs.flood_advert_interval = 47; // 47 hours
   _prefs.flood_max = 64;
@@ -692,9 +700,11 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
 
   memset(default_scope.key, 0, sizeof(default_scope.key));
 }
-
 void MyMesh::begin(FILESYSTEM *fs) {
   mesh::Mesh::begin();
+#if defined(WITH_MQTT_BRIDGE)
+  bridge.begin();
+#endif
   _fs = fs;
   // load persisted prefs
   _cli.loadPrefs(_fs);
@@ -983,6 +993,35 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
       addSystemPost(msg);
       snprintf(reply, MAX_POST_TEXT_LEN, "OK");
     }
+#if defined(WITH_MQTT_BRIDGE)
+  } else if (memcmp(command, "get mqtt.server", 15) == 0) {
+    strcpy(reply, bridge.getServer().c_str());
+  } else if (memcmp(command, "set mqtt.server ", 16) == 0) {
+    bridge.setServer(String(command + 16));
+    strcpy(reply, "OK");
+  } else if (memcmp(command, "get mqtt.port", 13) == 0) {
+    sprintf(reply, "%d", bridge.getPort());
+  } else if (memcmp(command, "set mqtt.port ", 14) == 0) {
+    bridge.setPort(atoi(command + 14));
+    strcpy(reply, "OK");
+  } else if (memcmp(command, "get mqtt.topic", 14) == 0) {
+    strcpy(reply, bridge.getTopic().c_str());
+  } else if (memcmp(command, "set mqtt.topic ", 15) == 0) {
+    bridge.setTopic(String(command + 15));
+    strcpy(reply, "OK");
+#endif
+#if defined(WIFI_SSID)
+  } else if (memcmp(command, "get wifi.ssid", 13) == 0) {
+    strcpy(reply, getWifiSSID().c_str());
+  } else if (memcmp(command, "set wifi.ssid ", 14) == 0) {
+    setWifiSSID(command + 14);
+    strcpy(reply, "OK");
+  } else if (memcmp(command, "get wifi.pwd", 12) == 0) {
+    strcpy(reply, "(hidden)");  // never echo the password back
+  } else if (memcmp(command, "set wifi.pwd ", 13) == 0) {
+    setWifiPwd(command + 13);
+    strcpy(reply, "OK");
+#endif
   } else{
     _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
   }
@@ -993,7 +1032,12 @@ bool MyMesh::saveFilter(ClientInfo* client) {
 }
 
 void MyMesh::loop() {
+#if !defined(DEBUG_SKIP_DISPATCHER)
   mesh::Mesh::loop();
+#endif
+#if defined(WITH_MQTT_BRIDGE)
+  bridge.loop();
+#endif
 
   if (millisHasNowPassed(next_push) && acl.getNumClients() > 0) {
     // check for ACK timeouts

@@ -88,6 +88,22 @@ struct PostInfo {
   uint32_t post_timestamp;   // by OUR clock
   char text[MAX_POST_TEXT_LEN+1];
 };
+#ifdef WITH_MQTT_BRIDGE
+  #include "helpers/bridges/MqttBridge.h"
+  #define WITH_BRIDGE
+#endif
+
+#ifdef WITH_BRIDGE
+extern AbstractBridge* bridge;
+#endif
+
+#if defined(WIFI_SSID)
+// WiFi credentials, runtime-configurable via NVS (see main.cpp). Declared
+// here so both main.cpp and MyMesh.cpp (CLI handler) can share them.
+extern String getWifiSSID();
+extern void setWifiSSID(const char* ssid);
+extern void setWifiPwd(const char* pwd);
+#endif
 
 class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   FILESYSTEM* _fs;
@@ -118,7 +134,9 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   uint8_t pending_sf;
   uint8_t pending_cr;
   int  matching_peer_indexes[MAX_CLIENTS];
-
+#if defined(WITH_MQTT_BRIDGE)
+  MqttBridge bridge;
+#endif
   void addPost(ClientInfo* client, const char* postData);
   void storePost(const mesh::Identity& author, const char* postData);
   void pushPostToClient(ClientInfo* client, PostInfo& post);
