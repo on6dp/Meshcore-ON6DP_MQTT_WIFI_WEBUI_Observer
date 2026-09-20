@@ -1,128 +1,128 @@
-## About MeshCore
+# 🎙️ ON6DP Firmware — Customized MeshCore Room Server
 
-MeshCore is a lightweight, portable C++ library that enables multi-hop packet routing for embedded projects using LoRa and other packet radios. It is designed for developers who want to create resilient, decentralized communication networks that work without the internet.
+🇫🇷 Version française | 🇬🇧 English version
 
-## 🔍 What is MeshCore?
+This repository is a customized fork of MeshCore, maintained by ON6DP (Belgian amateur radio operator, Liège region). 
+The original MeshCore project is untouched — this file only documents what was added on top of it.
 
-MeshCore now supports a range of LoRa devices, allowing for easy flashing without the need to compile firmware manually. Users can flash a pre-built binary using tools like Adafruit ESPTool and interact with the network through a serial console.
-MeshCore provides the ability to create wireless mesh networks, similar to Meshtastic and Reticulum but with a focus on lightweight multi-hop packet routing for embedded projects. Unlike Meshtastic, which is tailored for casual LoRa communication, or Reticulum, which offers advanced networking, MeshCore balances simplicity with scalability, making it ideal for custom embedded solutions, where devices (nodes) can communicate over long distances by relaying messages through intermediate nodes. This is especially useful in off-grid, emergency, or tactical situations where traditional communication infrastructure is unavailable.
+🇧🇪 What this firmware adds to the base MeshCore Room Server
 
-## ⚡ Key Features
+Flashed on a Heltec V4 (ESP32-S3, 868 MHz), this firmware turns a standard MeshCore Room Server into a remotely manageable, MQTT-connected observer, adding:
 
-* Multi-Hop Packet Routing
-  * Devices can forward messages across multiple nodes, extending range beyond a single radio's reach.
-  * Supports up to a configurable number of hops to balance network efficiency and prevent excessive traffic.
-  * Nodes use fixed roles where "Companion" nodes are not repeating messages at all to prevent adverse routing paths from being used.
-* Supports LoRa Radios – Works with Heltec, RAK Wireless, and other LoRa-based hardware.
-* Decentralized & Resilient – No central server or internet required; the network is self-healing.
-* Low Power Consumption – Ideal for battery-powered or solar-powered devices.
-* Simple to Deploy – Pre-built example applications make it easy to get started.
+\- \*\* WiFi  Fully hot-swappable WiFi (NVS-backed) — no reflashing needed to change networks, including a network scan directly from the web page
+\- \*\* Built-in MQTT bridge — publishes all observed mesh traffic to an MQTT broker (server/port/topic all hot-configurable), with:
+&#x20;		Correct hex encoding of raw packets (compatible with CoreScope)
+&#x20;		Periodic status heartbeat (origin, firmware, client_version), so the device shows up named in CoreScope's Observers tab
+&#x20;		Automatic, periodic promotional post on the mesh network itself (BBS Room Server), inviting other operators to join the same broker
 
-## 🎯 What Can You Use MeshCore For?
+\- \*\* 5-tab web config page (Radio / MQTT / WiFi / Stats / CLI), inspired by gessaman's observer:
 
-* Off-Grid Communication: Stay connected even in remote areas.
-* Emergency Response & Disaster Recovery: Set up instant networks where infrastructure is down.
-* Outdoor Activities: Hiking, camping, and adventure racing communication.
-* Tactical & Security Applications: Military, law enforcement, and private security use cases.
-* IoT & Sensor Networks: Collect data from remote sensors and relay it back to a central location.
+&#x20;		Fully async CLI console (JSON API, persistent history, no page reloads)
+&#x20;		Autocomplete across ~40 CLI commands
+&#x20;		Auto-refreshing display of all values
 
-## 🚀 How to Get Started
+\- \*\* Enhanced OLED screen — continuously shows the IP address and firmware version, alongside the standard radio info
 
-- Watch the [MeshCore QuickStart Playlist](https://www.youtube.com/watch?v=iaFltojJrAc&list=PLshzThxhw4O4WU_iZo3NmNZOv6KMrUuF9) by The Comms Channel
-- Watch the [MeshCore Technical Presentation](https://www.youtube.com/watch?v=OwmkVkZQTf4) by Liam Cottle.
-- Read through our [Frequently Asked Questions](./docs/faq.md) and [Documentation](https://docs.meshcore.io).
-- Flash the MeshCore firmware on a supported device.
-- Connect with a supported client.
+## 📚 Documentation
+examples/simple_room_server/TUTO_FLASH_HELTEC_ON6DP.md — complete flashing tutorial, written for absolute beginners (Python, Git, PlatformIO Core, no VS Code required). French only for now.
+examples/simple_room_server/COMMANDES_CLI_ON6DP.md — full CLI command reference. French only for now.
 
-For developers:
+##🔌 Hardware compatibility
 
-- Install [PlatformIO](https://docs.platformio.org) in [Visual Studio Code](https://code.visualstudio.com).
-- Clone and open the MeshCore repository in Visual Studio Code.
-- See the example applications you can modify and run:
-  - [Companion Radio](./examples/companion_radio) - For use with an external chat app, over BLE, USB or Wi-Fi.
-  - [KISS Modem](./examples/kiss_modem) - Serial KISS protocol bridge for host applications. ([protocol docs](./docs/kiss_modem_protocol.md))
-  - [Simple Repeater](./examples/simple_repeater) - Extends network coverage by relaying messages.
-  - [Simple Room Server](./examples/simple_room_server) - A simple BBS server for shared Posts.
-  - [Simple Secure Chat](./examples/simple_secure_chat) - Secure terminal based text communication between devices.
-  - [Simple Sensor](./examples/simple_sensor) - Remote sensor node with telemetry and alerting.
+This firmware was built and tested specifically on the Heltec V4 (ESP32-S3). Portability to other boards depends on the chip family:
 
-The Simple Secure Chat example can be interacted with through the Serial Monitor in Visual Studio Code, or with a Serial USB Terminal on Android.
+Other ESP32 boards (other Heltec models, T-Beam, etc.): the code (MqttBridge, WiFi/NVS handling, web page) relies on generic ESP32 libraries (WiFi.h, Preferences.h, WebServer.h), so it's portable in principle — but not usable out of the box: a new PlatformIO environment needs to be created, extending the target board's base definition instead of heltec_v4_oled.
+Non-ESP32 boards (nRF52840 — SenseCAP T1000-E, ThinkNode M6, SenseCAP Solar Node P1-Pro...): not compatible, and this is a hardware limitation, not a code one — these chips have no WiFi radio, so none of this firmware's WiFi/MQTT/web features are physically possible on them. These boards remain usable as standard MeshCore Room Servers/Repeaters (LoRa only), just without these additions.
+🛠️ Build environment
 
-## ⚡️ MeshCore Flasher
+The main environment is heltec_v4_room_server_wifi_mqtt, defined in variants/heltec_v4/platformio.ini.
 
-We have prebuilt firmware ready to flash on supported devices.
+bash
+git clone https://github.com/on6dp/Meshcore-ON6DP_MQTT_WIFI_WEBUI_Observer.git
+cd Meshcore-ON6DP_MQTT_WIFI_WEBUI_Observer
+pio run -e heltec_v4_room_server_wifi_mqtt -t upload --upload-port COMx
 
-- Launch https://meshcore.io/flasher
-- Select a supported device
-- Flash one of the firmware types:
-  - Companion, Repeater or Room Server
-- Once flashing is complete, you can connect with one of the MeshCore clients below.
+⚠️ On some PC/cable combinations, flashing may fail with No serial data received. Adding upload_flags = --no-stub and upload_speed = 115200 to the environment fixes this (already in place in this repo).
 
-## 📱 MeshCore Clients
+🙏 Credits
 
-**Companion Firmware**
+This firmware builds entirely on the work of the MeshCore project and its community. The additions documented here are local customizations, shared in the same open-source spirit as the original project.
 
-The companion firmware can be connected to via BLE, USB or Wi-Fi depending on the firmware type you flashed.
+73, Paul — ON6DP
 
-- Web: https://app.meshcore.nz
-- Android: https://play.google.com/store/apps/details?id=com.liamcottle.meshcore.android
-- iOS: https://apps.apple.com/us/app/meshcore/id6742354151?platform=iphone
-- NodeJS: https://github.com/liamcottle/meshcore.js
-- Python: https://github.com/fdlamotte/meshcore-cli
 
-**Repeater and Room Server Firmware**
 
-The repeater and room server firmware can be set up via USB in the web config tool.
+# 🎙️ Firmware ON6DP — MeshCore Room Server personnalisé
 
-- https://config.meshcore.io
+Ce dépôt est un \*\*fork personnalisé\*\* de \[MeshCore](https://github.com/meshcore-dev/MeshCore),maintenu par \*\*ON6DP\*\* (radioamateur belge, région Liège). 
+Le projet MeshCore original reste inchangé — ce fichier documente uniquement \*\*ce qui a été ajouté\*\* par rapport à l'original.
 
-They can also be managed via LoRa in the mobile app by using the Remote Management feature.
 
-## 🛠 Hardware Compatibility
+\## 🇧🇪 Ce que ce firmware ajoute au Room Server MeshCore de base:
 
-MeshCore is designed for devices listed in the [MeshCore Flasher](https://meshcore.io/flasher)
+Flashé sur un \*\*Heltec V4 (ESP32-S3, 868 MHz)\*\*, ce firmware transforme un Room Server MeshCore standard en \*\*observateur MQTT connecté et administrable à distance\*\*, avec :
 
-## 📜 License
+\- \*\*WiFi entièrement modifiable à chaud\*\* (NVS) — plus besoin de reflasher pour changer de réseau, y compris un scan des réseaux disponibles directement depuis la page web
+\- \*\*Bridge MQTT intégré\*\* — publie tout le trafic mesh observé vers un broker MQTT (serveur/port/topic modifiables à chaud), avec :
 
-MeshCore is open-source software released under the MIT License. You are free to use, modify, and distribute it for personal and commercial projects.
+&#x20; 		- Encodage hexadécimal correct des paquets (compatible \[CoreScope](https://github.com/Kpa-clawbot/CoreScope))
+&#x20; 		- Message de statut périodique (`origin`, `firmware`, `client\_version`), pour apparaître nommé dans l'onglet Observers de CoreScope
+&#x20; 		- Publication automatique et périodique d'un message promotionnel sur le réseau mesh (BBS Room Server), pour inviter d'autres opérateurs à rejoindre le même broker
 
-## Contributing
+\- \*\*Page web de configuration à 5 onglets\*\* (Radio / MQTT / WiFi / Stats / CLI), inspirée de \[gessaman's observer](https://observer.gessaman.com) :
 
-Please submit PR's using 'dev' as the base branch!
-For minor changes just submit your PR and we'll try to review it, but for anything more 'impactful' please open an Issue first and start a discussion. It is better to sound out what it is you want to achieve first, and try to come to a consensus on what the best approach is, especially when it impacts the structure or architecture of this codebase.
+&#x20; 		- Console CLI asynchrone (API JSON, historique persistant, pas de rechargement de page)
+&#x20; 		- Autocomplétion sur \~40 commandes CLI
+&#x20; 		- Rafraîchissement automatique de toutes les valeurs affichées
 
-Here are some general principles you should try to adhere to:
-* Keep it simple. Please, don't think like a high-level lang programmer. Think embedded, and keep code concise, without any unnecessary layers.
-* No dynamic memory allocation, except during setup/begin functions.
-* Use the same brace and indenting style that's in the core source modules. (A .clang-format is probably going to be added soon, but please do NOT retroactively re-format existing code. This just creates unnecessary diffs that make finding problems harder)
+\- \*\*Écran OLED enrichi\*\* — affiche en continu l'adresse IP et la version du firmware, en plus des infos radio standard
 
-Help us prioritize! Please react with thumbs-up to issues/PRs you care about most. We look at reaction counts when planning work.
+## 📚 Documentation
 
-### Running unit tests
+\- \[`examples/simple\_room\_server/TUTO\_FLASH\_HELTEC\_ON6DP.md`](examples/simple\_room\_server/TUTO\_FLASH\_HELTEC\_ON6DP.md)
+&#x09;— tutoriel complet pour flasher ce firmware, pensé pour des débutants complets (Python, Git, PlatformIO Core, sans VS Code requis)
 
-To run unit tests, run the following command:
+\- \[`examples/simple\_room\_server/COMMANDES\_CLI\_ON6DP.md`](examples/simple\_room\_server/COMMANDES\_CLI\_ON6DP.md)
+&#x20; 	— référence complète des commandes CLI disponibles
+
+
+## 🔌 Compatibilité matérielle
+
+Ce firmware a été développé et testé **spécifiquement sur Heltec V4**(ESP32-S3). Sa portabilité vers d'autres cartes dépend du **type de puce** :
+
+- **Autres cartes ESP32** (autres modèles Heltec, T-Beam, etc.) : le code   (`MqttBridge`, gestion WiFi/NVS, page web) repose sur des bibliothèques ESP32 **génériques** (`WiFi.h`,
+   `Preferences.h`, `WebServer.h`), donc **portable en principe** — mais pas prêt à l'emploi tel quel : il faut créer un nouvel environnement dans `platformio.ini`, qui étend la
+   définition de la carte cible au lieu de `heltec_v4_oled`.
+
+- **Cartes non-ESP32** (nRF52840 — SenseCAP T1000-E, ThinkNode M6, SenseCAP Solar Node P1-Pro...) : **incompatible**, et ce n'est pas une limite du code mais du matériel.
+   Ces puces **n'ont pas de WiFi**, donc aucune des fonctionnalités WiFi/MQTT/page web de ce firmware n'est physiquement possible dessus. Ces cartes restent utilisables en Room
+   Server/Repeater MeshCore standard (LoRa pur), juste sans ces ajouts.
+
+## 🛠️ Environnement de compilation
+
+L'environnement principal est `heltec\_v4\_room\_server\_wifi\_mqtt`, défini dans \[`variants/heltec\_v4/platformio.ini`](variants/heltec\_v4/platformio.ini).
 
 ```bash
-pio test --environment native --verbose
+
+git clone https://github.com/on6dp/Meshcore-ON6DP\_MQTT\_WIFI\_WEBUI\_Observer.git
+cd Meshcore-ON6DP\_MQTT\_WIFI\_WEBUI\_Observer
+pio run -e heltec\_v4\_room\_server\_wifi\_mqtt -t upload --upload-port COMx
+
 ```
+⚠️ Sur certains PC/câbles, le flash peut échouer avec `No serial data received`. Ajouter `upload\_flags = --no-stub` et `u1pload\_speed = 115200` à l'environnement résout ce problème (déjà en place dans ce dépôt).
 
-## Road-Map / To-Do
 
-There are a number of fairly major features in the pipeline, with no particular time-frames attached yet. In very rough chronological order:
-- [X] Companion radio: UI redesign
-- [X] Repeater + Room Server: add ACL's (like Sensor Node has)
-- [X] Standardise Bridge mode for repeaters
-- [ ] Repeater/Bridge: Standardise the Transport Codes for zoning/filtering
-- [X] Core + Repeater: enhanced zero-hop neighbour discovery
-- [ ] Core: round-trip manual path support
-- [ ] Companion + Apps: support for multiple sub-meshes (and 'off-grid' client repeat mode)
-- [ ] Core + Apps: support for LZW message compression
-- [ ] Core: dynamic CR (Coding Rate) for weak vs strong hops
-- [ ] Core: new framework for hosting multiple virtual nodes on one physical device
-- [ ] V2 protocol spec: discussion and consensus around V2 packet protocol, including path hashes, new encryption specs, etc
+\## 🙏 Crédits
 
-## 📞 Get Support
 
-- Report bugs and request features on the [GitHub Issues](https://github.com/ripplebiz/MeshCore/issues) page.
-- Find additional guides and components on [my site](https://buymeacoffee.com/ripplebiz).
-- Join [MeshCore Discord](https://meshcore.gg) to chat with the developers and get help from the community.
+
+Ce firmware s'appuie entièrement sur le travail du projet \[\*\*MeshCore\*\*](https://github.com/meshcore-dev/MeshCore) et de sa communauté. Les ajouts documentés ici sont des personnalisations locales, partagées dans l'esprit open-source du projet d'origine.
+
+
+
+\---
+
+
+
+\*73, Paul — ON6DP\*
+
