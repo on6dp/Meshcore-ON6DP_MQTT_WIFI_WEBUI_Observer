@@ -102,6 +102,11 @@ void UITask::renderCurrScreen() {
     }
     _display->print(tmp);
 #endif
+
+    // firmware version (already computed in begin(), was only shown on
+    // the boot screen before - now also on the persistent home screen)
+    _display->setCursor(0, 50);
+    _display->print(_version_info);
   }
 }
 

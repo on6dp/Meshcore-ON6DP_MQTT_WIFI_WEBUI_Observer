@@ -18,7 +18,77 @@ simple sur le port 1883.
 **Bonne nouvelle vérifiée** : le port **8084** est libre sur le VPS (confirmé
 via `ss -tlnp | grep 8084` — aucun résultat).
 
-## Étapes restant à faire
+## ⚠️ Découverte du jour : bug de reconnexion similaire, mais sur un tout autre canal
+En testant CoreDrive RX en direct (PC, Chrome), la connexion WebSocket
+(`wss://meshcore.no-ip.org/mqtt-ws`) montre un cycle de coupure très
+régulier — environ **5 secondes** de connexion active à chaque fois,
+confirmé sur plus de 15 cycles consécutifs dans le journal de l'app :
+```
+18:57:47 connected → 18:57:52 offline (5s)
+18:57:56 connected → 18:58:01 offline (5s)
+```
+
+**Rappel important — probablement une coïncidence, pas le même bug** que
+celui du Heltec (`MQTT_RECONNECT_BUG.md`) : les deux chemins techniques
+sont complètement différents (Heltec = TCP direct port 1883 vers Mosquitto ;
+CoreDrive RX = WebSocket port 8084, **via Caddy** en intermédiaire). Un
+timing similaire pourrait très bien être deux causes distinctes.
+
+**Vérifié et écarté** : rien dans `mosquitto.conf` n'explique un timeout à
+5s (pas de directive de ce genre) ; le `keepalive 60s` négocié par
+CoreDrive RX devrait tolérer ~90s d'inactivité avant coupure MQTT normale
+— donc pas un simple problème de keepalive MQTT standard.
+
+**Pistes à explorer lors d'une prochaine session** :
+- Config de timeout côté **Caddy** pour les connexions WebSocket
+  proxifiées (`reverse_proxy` a potentiellement un idle timeout par
+  défaut à vérifier/ajuster)
+- Logs Mosquitto en mode debug (`log_type debug`) pour voir la vraie
+  raison de fermeture côté broker
+- Comparer avec une connexion WebSocket testée directement (sans Caddy,
+  directement sur le port 8084) pour isoler si Caddy est bien en cause
+
+## 🎉 Intégration technique réussie, affichage encore à découvrir
+Toute la chaîne technique fonctionne, de bout en bout, **confirmé par requête
+SQL directe** :
+- CoreDrive RX (hébergé sur `https://drive.meshcore.no-ip.org`, sous-domaine
+  dédié nécessaire — voir note ci-dessous) se connecte en Bluetooth au
+  T1000-E (rôle Companion), publie via `wss://meshcore.no-ip.org/mqtt-ws`
+- CoreScope stocke bien les données : table `client_rf_samples` (confirmé
+  `SELECT COUNT(*)` > 0, avec position GPS, batterie, bruit de fond)
+- **Réglage nécessaire dans `config.json`** : il existe **3 tables distinctes**
+  à activer séparément (toutes désactivées par défaut) :
+  ```json
+  "clientRxCoverage": { "enabled": true },
+  "clientRxObservations": { "enabled": true },
+  "clientRfSamples": { "enabled": true },
+  ```
+  Les données de CoreDrive RX (`type":"RF_SAMPLE"`) alimentent
+  spécifiquement `client_rf_samples`.
+
+**Ce qui reste flou** : aucun onglet du dashboard (`RF Health`, `Map`,
+`Analytics`...) n'affiche visiblement ces données pour l'instant — la
+fonctionnalité semble stockée mais sans interface graphique dédiée encore
+développée côté CoreScope (probablement une fonctionnalité très récente,
+"opt-in désactivée par défaut"). À revérifier lors d'une future mise à jour
+de CoreScope, ou à interroger directement en SQL en attendant :
+```bash
+sqlite3 /root/meshcore-data/meshcore.db "SELECT * FROM client_rf_samples ORDER BY rowid DESC LIMIT 10;"
+```
+
+## ⚠️ Piège important découvert : sous-chemin vs sous-domaine
+CoreDrive RX est compilé avec des chemins **absolus** (`/assets/...`), pas
+relatifs — impossible de l'héberger sous un sous-chemin (`/coredrive/`) d'un
+domaine existant, ça casse le chargement JS silencieusement (page vide, rien
+de cliquable). **Il faut un sous-domaine dédié.**
+
+Solution trouvée : wildcard DNS déjà configuré sur le compte No-IP payant de
+l'utilisateur (`*.meshcore.no-ip.org` → IP du VPS), permettant de créer
+`drive.meshcore.no-ip.org` sans configuration DNS supplémentaire. Caddy gère
+alors ce second domaine séparément dans le même `Caddyfile`, avec son propre
+certificat Let's Encrypt automatique.
+
+## Étapes du plan — toutes complétées
 1. ✅ **FAIT** — Listener WebSocket Mosquitto ajouté (`listener 8084` +
    `protocol websockets` dans un `mosquitto.conf` monté depuis
    `/root/meshcore-data/mosquitto.conf`, via `docker-compose.yml`). Testé
