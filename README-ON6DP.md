@@ -1,6 +1,4 @@
-\# 🎙️ Firmware ON6DP — MeshCore Room Server personnalisé
-
-
+# 🎙️ Firmware ON6DP — MeshCore Room Server personnalisé
 
 Ce dépôt est un \*\*fork personnalisé\*\* de \[MeshCore](https://github.com/meshcore-dev/MeshCore),maintenu par \*\*ON6DP\*\* (radioamateur belge, région Liège). 
 Le projet MeshCore original reste inchangé — ce fichier documente uniquement \*\*ce qui a été ajouté\*\* par rapport à l'original.
@@ -26,7 +24,7 @@ Flashé sur un \*\*Heltec V4 (ESP32-S3, 868 MHz)\*\*, ce firmware transforme un 
 
 \- \*\*Écran OLED enrichi\*\* — affiche en continu l'adresse IP et la version du firmware, en plus des infos radio standard
 
-\## 📚 Documentation
+## 📚 Documentation
 
 \- \[`examples/simple\_room\_server/TUTO\_FLASH\_HELTEC\_ON6DP.md`](examples/simple\_room\_server/TUTO\_FLASH\_HELTEC\_ON6DP.md)
 &#x09;— tutoriel complet pour flasher ce firmware, pensé pour des débutants complets (Python, Git, PlatformIO Core, sans VS Code requis)
@@ -47,7 +45,7 @@ Ce firmware a été développé et testé **spécifiquement sur Heltec V4**(ESP3
    Ces puces **n'ont pas de WiFi**, donc aucune des fonctionnalités WiFi/MQTT/page web de ce firmware n'est physiquement possible dessus. Ces cartes restent utilisables en Room
    Server/Repeater MeshCore standard (LoRa pur), juste sans ces ajouts.
 
-\## 🛠️ Environnement de compilation
+## 🛠️ Environnement de compilation
 
 L'environnement principal est `heltec\_v4\_room\_server\_wifi\_mqtt`, défini dans \[`variants/heltec\_v4/platformio.ini`](variants/heltec\_v4/platformio.ini).
 
