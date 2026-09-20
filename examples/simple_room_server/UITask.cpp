@@ -1,6 +1,9 @@
 #include "UITask.h"
 #include <Arduino.h>
 #include <helpers/CommonCLI.h>
+#ifdef WIFI_SSID
+#include <WiFi.h>
+#endif
 
 #ifndef USER_BTN_PRESSED
 #define USER_BTN_PRESSED LOW
@@ -88,6 +91,17 @@ void UITask::renderCurrScreen() {
     _display->setCursor(0, 30);
     sprintf(tmp, "BW: %03.2f CR: %d", _node_prefs->bw, _node_prefs->cr);
     _display->print(tmp);
+
+    // WiFi IP address, on the same home screen as the rest of the node info
+#ifdef WIFI_SSID
+    _display->setCursor(0, 40);
+    if (WiFi.status() == WL_CONNECTED) {
+      sprintf(tmp, "IP: %s", WiFi.localIP().toString().c_str());
+    } else {
+      sprintf(tmp, "WiFi: connecting...");
+    }
+    _display->print(tmp);
+#endif
   }
 }
 

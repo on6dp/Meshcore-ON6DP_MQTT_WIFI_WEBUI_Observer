@@ -159,12 +159,14 @@ void MqttBridge::publish(mesh::Packet *packet, const char *dir, float score, int
   toHexHash(hash, MAX_HASH_SIZE, hash_hex);
 
   // JSON buffer sized generously for a hex payload (2 chars/byte) up to MAX_TRANS_UNIT+1 bytes
-  unsigned int json_size = (raw_len * 2) + 256;
+  unsigned int json_size = (raw_len * 2) + 320;
   char *json = (char *)malloc(json_size);
   if (json) {
     snprintf(json, json_size,
-             "{\"dir\":\"%s\",\"type\":%d,\"route\":\"%s\",\"payload_len\":%d,"
+             "{\"origin\":\"%s\",\"origin_id\":\"%s\","
+             "\"dir\":\"%s\",\"type\":%d,\"route\":\"%s\",\"payload_len\":%d,"
              "\"snr\":%d,\"rssi\":%d,\"score\":%d,\"hash\":\"%s\",\"raw\":\"%s\"}",
+             _node_prefs->node_name, MQTT_CLIENT_ID,
              dir, packet->getPayloadType(), packet->isRouteDirect() ? "D" : "F", packet->payload_len,
              (int)packet->getSNR(), rssi, (int)(score * 1000), hash_hex, raw_hex);
 
