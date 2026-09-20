@@ -24,7 +24,7 @@
   #define MQTT_STATUS_REGION "BE"
 #endif
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION "v1.17.1"
+  #define FIRMWARE_VERSION "v1.17.3"
 #endif
 // Custom label sent as the "firmware" field to CoreScope - distinct from
 // FIRMWARE_VERSION (which stays the real underlying MeshCore build version,
