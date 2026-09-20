@@ -77,6 +77,17 @@
   #define TXT_ACK_DELAY     200
 #endif
 
+// Periodic promotional room.post, repeated automatically so new operators
+// discovering this Room Server by radio learn about the shared MQTT broker,
+// without depending on the message still being in the (limited, 32-slot)
+// unsynced posts queue from a one-off manual post.
+#ifndef PROMO_POST_INTERVAL_MS
+  #define PROMO_POST_INTERVAL_MS (7UL*24*60*60*1000)  // once a week, by default
+#endif
+#ifndef PROMO_POST_TEXT
+  #define PROMO_POST_TEXT "Broker MQTT public: mqtt.no-ip.org:1883 - topic meshcore/# - join Network BE/FR/NL/DE !"
+#endif
+
 #define FIRMWARE_ROLE "room_server"
 
 #define PACKET_LOG_FILE  "/packet_log"
@@ -120,6 +131,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   unsigned long dirty_contacts_expiry;
   uint8_t reply_data[MAX_PACKET_PAYLOAD];
   unsigned long next_push;
+  unsigned long next_promo_post;
   uint16_t _num_posted, _num_post_pushes;
   int next_client_idx;  // for round-robin polling
   int next_post_idx;

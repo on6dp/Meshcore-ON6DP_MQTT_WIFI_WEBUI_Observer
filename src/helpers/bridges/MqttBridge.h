@@ -15,13 +15,23 @@
   #define MQTT_PORT 1883
 #endif
 #ifndef MQTT_TOPIC
-  #define MQTT_TOPIC "meshcore/rx"
+  #define MQTT_TOPIC "meshcore/BE/meshcore-observer/packets"
 #endif
 #ifndef MQTT_CLIENT_ID
   #define MQTT_CLIENT_ID "meshcore-observer"
 #endif
 #ifndef MQTT_STATUS_REGION
   #define MQTT_STATUS_REGION "BE"
+#endif
+#ifndef FIRMWARE_VERSION
+  #define FIRMWARE_VERSION "v1.17.1"
+#endif
+// Custom label sent as the "firmware" field to CoreScope - distinct from
+// FIRMWARE_VERSION (which stays the real underlying MeshCore build version,
+// used elsewhere for protocol compatibility). Override via build_flags,
+// e.g. -D MQTT_FIRMWARE_LABEL='"ON6DP-Custom Firmware 1.17.3"'
+#ifndef MQTT_FIRMWARE_LABEL
+  #define MQTT_FIRMWARE_LABEL FIRMWARE_VERSION
 #endif
 
 /**

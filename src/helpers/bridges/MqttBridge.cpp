@@ -116,10 +116,15 @@ void MqttBridge::publishStatus() {
   char topic[80];
   snprintf(topic, sizeof(topic), "meshcore/%s/%s/status", MQTT_STATUS_REGION, MQTT_CLIENT_ID);
 
-  char json[220];
+  // "firmware" and "client_version" are two distinct fields CoreScope reads
+  // separately (confirmed in its v2.1.1 release notes) - firmware is the
+  // actual MeshCore build version, client_version is more of a label for
+  // the bridge/app publishing this status.
+  char json[260];
   snprintf(json, sizeof(json),
-           "{\"status\":\"online\",\"origin\":\"%s\",\"origin_id\":\"%s\",\"client_version\":\"on6dp-heltec-v4\"}",
-           _node_prefs->node_name, MQTT_CLIENT_ID);
+           "{\"status\":\"online\",\"origin\":\"%s\",\"origin_id\":\"%s\","
+           "\"firmware\":\"%s\",\"client_version\":\"on6dp-heltec-v4\"}",
+           _node_prefs->node_name, MQTT_CLIENT_ID, MQTT_FIRMWARE_LABEL);
 
   bool ok = _mqtt.publish(topic, json);
   Serial.printf("MqttBridge: status published to %s, ok=%d\n", topic, (int)ok);

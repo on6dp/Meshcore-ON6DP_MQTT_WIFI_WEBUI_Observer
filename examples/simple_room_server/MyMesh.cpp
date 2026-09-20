@@ -695,6 +695,7 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
   next_post_idx = 0;
   next_client_idx = 0;
   next_push = 0;
+  next_promo_post = millis() + (5UL*60*1000);  // first promo post 5 minutes after boot
   memset(posts, 0, sizeof(posts));
   _num_posted = _num_post_pushes = 0;
 
@@ -1038,6 +1039,11 @@ void MyMesh::loop() {
 #if defined(WITH_MQTT_BRIDGE)
   bridge.loop();
 #endif
+
+  if (millisHasNowPassed(next_promo_post)) {
+    addSystemPost(PROMO_POST_TEXT);
+    next_promo_post = futureMillis(PROMO_POST_INTERVAL_MS);
+  }
 
   if (millisHasNowPassed(next_push) && acl.getNumClients() > 0) {
     // check for ACK timeouts
