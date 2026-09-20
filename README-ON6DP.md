@@ -2,67 +2,45 @@
 
 
 
-Ce dépôt est un \*\*fork personnalisé\*\* de \[MeshCore](https://github.com/meshcore-dev/MeshCore),
+Ce dépôt est un \*\*fork personnalisé\*\* de \[MeshCore](https://github.com/meshcore-dev/MeshCore),maintenu par \*\*ON6DP\*\* (radioamateur belge, région Liège). 
 
-maintenu par \*\*ON6DP\*\* (radioamateur belge, région Liège). Le projet MeshCore
-
-original reste inchangé — ce fichier documente uniquement \*\*ce qui a été
-
-ajouté\*\* par rapport à l'original.
+Le projet MeshCore original reste inchangé — ce fichier documente uniquement \*\*ce qui a été ajouté\*\* par rapport à l'original.
 
 
 
-\## 🇧🇪 Ce que ce firmware ajoute au Room Server MeshCore de base
+\## 🇧🇪 Ce que ce firmware ajoute au Room Server MeshCore de base:
 
 
 
-Flashé sur un \*\*Heltec V4 (ESP32-S3, 868 MHz)\*\*, ce firmware transforme un
-
-Room Server MeshCore standard en \*\*observateur MQTT connecté et administrable
-
-à distance\*\*, avec :
+Flashé sur un \*\*Heltec V4 (ESP32-S3, 868 MHz)\*\*, ce firmware transforme un Room Server MeshCore standard en \*\*observateur MQTT connecté et administrable à distance\*\*, avec :
 
 
 
-\- \*\*WiFi entièrement modifiable à chaud\*\* (NVS) — plus besoin de reflasher
+\- \*\*WiFi entièrement modifiable à chaud\*\* (NVS) — plus besoin de reflasher pour changer de réseau, y compris un scan des réseaux disponibles directement depuis la page web
 
-&#x20; pour changer de réseau, y compris un scan des réseaux disponibles
 
-&#x20; directement depuis la page web
 
-\- \*\*Bridge MQTT intégré\*\* — publie tout le trafic mesh observé vers un
+\- \*\*Bridge MQTT intégré\*\* — publie tout le trafic mesh observé vers un broker MQTT (serveur/port/topic modifiables à chaud), avec :
 
-&#x20; broker MQTT (serveur/port/topic modifiables à chaud), avec :
+&#x20; 		- Encodage hexadécimal correct des paquets (compatible \[CoreScope](https://github.com/Kpa-clawbot/CoreScope))
 
-&#x20; - Encodage hexadécimal correct des paquets (compatible
+&#x20; 		- Message de statut périodique (`origin`, `firmware`, `client\_version`), pour apparaître nommé dans l'onglet Observers de CoreScope
 
-&#x20;   \[CoreScope](https://github.com/Kpa-clawbot/CoreScope))
+&#x20; 		- Publication automatique et périodique d'un message promotionnel sur le réseau mesh (BBS Room Server), pour inviter d'autres opérateurs à rejoindre le même broker
 
-&#x20; - Message de statut périodique (`origin`, `firmware`, `client\_version`),
 
-&#x20;   pour apparaître nommé dans l'onglet Observers de CoreScope
 
-&#x20; - Publication automatique et périodique d'un message promotionnel sur le
+\- \*\*Page web de configuration à 5 onglets\*\* (Radio / MQTT / WiFi / Stats / CLI), inspirée de \[gessaman's observer](https://observer.gessaman.com) :
 
-&#x20;   réseau mesh (BBS Room Server), pour inviter d'autres opérateurs à
+&#x20; 		- Console CLI asynchrone (API JSON, historique persistant, pas de rechargement de page)
 
-&#x20;   rejoindre le même broker
+&#x20; 		- Autocomplétion sur \~40 commandes CLI
 
-\- \*\*Page web de configuration à 5 onglets\*\* (Radio / MQTT / WiFi / Stats /
+&#x20; 		- Rafraîchissement automatique de toutes les valeurs affichées
 
-&#x20; CLI), inspirée de \[gessaman's observer](https://observer.gessaman.com) :
 
-&#x20; - Console CLI asynchrone (API JSON, historique persistant, pas de
 
-&#x20;   rechargement de page)
-
-&#x20; - Autocomplétion sur \~40 commandes CLI
-
-&#x20; - Rafraîchissement automatique de toutes les valeurs affichées
-
-\- \*\*Écran OLED enrichi\*\* — affiche en continu l'adresse IP et la version du
-
-&#x20; firmware, en plus des infos radio standard
+\- \*\*Écran OLED enrichi\*\* — affiche en continu l'adresse IP et la version du firmware, en plus des infos radio standard
 
 
 
@@ -72,13 +50,11 @@ Room Server MeshCore standard en \*\*observateur MQTT connecté et administrable
 
 \- \[`examples/simple\_room\_server/TUTO\_FLASH\_HELTEC\_ON6DP.md`](examples/simple\_room\_server/TUTO\_FLASH\_HELTEC\_ON6DP.md)
 
-&#x20; — tutoriel complet pour flasher ce firmware, pensé pour des débutants
-
-&#x20; complets (Python, Git, PlatformIO Core, sans VS Code requis)
+&#x09;— tutoriel complet pour flasher ce firmware, pensé pour des débutants complets (Python, Git, PlatformIO Core, sans VS Code requis)
 
 \- \[`examples/simple\_room\_server/COMMANDES\_CLI\_ON6DP.md`](examples/simple\_room\_server/COMMANDES\_CLI\_ON6DP.md)
 
-&#x20; — référence complète des commandes CLI disponibles
+&#x20; 	— référence complète des commandes CLI disponibles
 
 
 
@@ -86,9 +62,7 @@ Room Server MeshCore standard en \*\*observateur MQTT connecté et administrable
 
 
 
-L'environnement principal est `heltec\_v4\_room\_server\_wifi\_mqtt`, défini dans
-
-\[`variants/heltec\_v4/platformio.ini`](variants/heltec\_v4/platformio.ini).
+L'environnement principal est `heltec\_v4\_room\_server\_wifi\_mqtt`, défini dans \[`variants/heltec\_v4/platformio.ini`](variants/heltec\_v4/platformio.ini).
 
 
 
@@ -104,13 +78,7 @@ pio run -e heltec\_v4\_room\_server\_wifi\_mqtt -t upload --upload-port COMx
 
 
 
-⚠️ Sur certains PC/câbles, le flash peut échouer avec
-
-`No serial data received`. Ajouter `upload\_flags = --no-stub` et
-
-`upload\_speed = 115200` à l'environnement résout ce problème (déjà en place
-
-dans ce dépôt).
+⚠️ Sur certains PC/câbles, le flash peut échouer avec `No serial data received`. Ajouter `upload\_flags = --no-stub` et `u1pload\_speed = 115200` à l'environnement résout ce problème (déjà en place dans ce dépôt).
 
 
 
@@ -118,13 +86,7 @@ dans ce dépôt).
 
 
 
-Ce firmware s'appuie entièrement sur le travail du projet
-
-\[\*\*MeshCore\*\*](https://github.com/meshcore-dev/MeshCore) et de sa
-
-communauté. Les ajouts documentés ici sont des personnalisations locales,
-
-partagées dans l'esprit open-source du projet d'origine.
+Ce firmware s'appuie entièrement sur le travail du projet \[\*\*MeshCore\*\*](https://github.com/meshcore-dev/MeshCore) et de sa communauté. Les ajouts documentés ici sont des personnalisations locales, partagées dans l'esprit open-source du projet d'origine.
 
 
 
