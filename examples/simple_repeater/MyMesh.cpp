@@ -477,7 +477,10 @@ void MyMesh::logRxRaw(float snr, float rssi, const uint8_t raw[], int len) {
 }
 
 void MyMesh::logRx(mesh::Packet *pkt, int len, float score) {
-#ifdef WITH_BRIDGE
+#if defined(WITH_MQTT_BRIDGE)
+  // observer bridge: every received packet is published, with its RX metadata
+  bridge.publishRx(pkt, len, score, (int)_radio->getLastRSSI());
+#elif defined(WITH_BRIDGE)
   if (_prefs.bridge_pkt_src == 1) {
     bridge.sendPacket(pkt);
   }
@@ -503,7 +506,9 @@ void MyMesh::logRx(mesh::Packet *pkt, int len, float score) {
 }
 
 void MyMesh::logTx(mesh::Packet *pkt, int len) {
-#ifdef WITH_BRIDGE
+#if defined(WITH_MQTT_BRIDGE)
+  bridge.sendPacket(pkt);   // observer bridge: published as "tx"
+#elif defined(WITH_BRIDGE)
   if (_prefs.bridge_pkt_src == 0) {
     bridge.sendPacket(pkt);
   }
@@ -870,6 +875,9 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
       , bridge(&_prefs, WITH_RS232_BRIDGE, _mgr, &rtc)
 #endif
 #if defined(WITH_ESPNOW_BRIDGE)
+      , bridge(&_prefs, _mgr, &rtc)
+#endif
+#if defined(WITH_MQTT_BRIDGE)
       , bridge(&_prefs, _mgr, &rtc)
 #endif
 {
@@ -1279,6 +1287,26 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
       sendNodeDiscoverReq();
       strcpy(reply, "OK - Discover sent");
     }
+#if defined(WITH_MQTT_BRIDGE)
+  } else if (memcmp(command, "get mqtt.server", 15) == 0) {
+    strcpy(reply, bridge.getServer().c_str());
+  } else if (memcmp(command, "set mqtt.server ", 16) == 0) {
+    bridge.setServer(String(command + 16));
+    strcpy(reply, "OK");
+  } else if (memcmp(command, "get mqtt.port", 13) == 0) {
+    sprintf(reply, "%d", bridge.getPort());
+  } else if (memcmp(command, "set mqtt.port ", 14) == 0) {
+    bridge.setPort(atoi(command + 14));
+    strcpy(reply, "OK");
+  } else if (memcmp(command, "get mqtt.topic", 14) == 0) {
+    strcpy(reply, bridge.getTopic().c_str());
+  } else if (memcmp(command, "set mqtt.topic ", 15) == 0) {
+    bridge.setTopic(String(command + 15));
+    strcpy(reply, "OK");
+  } else if (memcmp(command, "get mqtt.status", 15) == 0) {
+    sprintf(reply, "%s, published=%u, failed=%u", bridge.isConnected() ? "connected" : "disconnected",
+            (unsigned)bridge.getPublishCount(), (unsigned)bridge.getPublishFailCount());
+#endif
   } else{
     _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
   }

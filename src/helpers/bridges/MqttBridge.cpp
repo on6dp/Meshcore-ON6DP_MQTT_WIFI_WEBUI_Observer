@@ -6,7 +6,11 @@
 // sent as hex, not base64 (see publish() below).
 
 MqttBridge::MqttBridge(NodePrefs *prefs, mesh::PacketManager *mgr, mesh::RTCClock *rtc)
+#ifdef MQTT_NET_EXTERNAL
+    : BridgeBase(prefs, mgr, rtc), _mqtt(mqttNetClient()), _node_prefs(prefs) {}
+#else
     : BridgeBase(prefs, mgr, rtc), _mqtt(_wifiClient), _node_prefs(prefs) {}
+#endif
 
 void MqttBridge::loadSettings() {
   _store.begin("mqttcfg", false);  // read-write namespace in NVS
@@ -19,11 +23,15 @@ void MqttBridge::loadSettings() {
 void MqttBridge::begin() {
   loadSettings();
   BRIDGE_DEBUG_PRINTLN("MqttBridge: init, broker=%s:%d topic=%s\n", _server.c_str(), _port, _topic.c_str());
+#ifdef MQTT_NET_EXTERNAL
+  _mqtt.setSocketTimeout(5);   // seconds - keeps a silent broker from blocking the mesh loop for long
+#else
   _wifiClient.setTimeout(30);  // seconds - ESP32 WiFiClient defaults to a 5s read timeout,
                                 // which silently tears down the socket during quiet periods
                                 // with no MQTT traffic (well before our 15s MQTT keepalive
                                 // would even trigger a PING). This was causing the connection
                                 // to drop roughly every 5 seconds.
+#endif
   _mqtt.setBufferSize(1024);  // default PubSubClient buffer (256 bytes) is too small for our
                                // base64-encoded packet payloads and can corrupt the connection
   _mqtt.setServer(_server.c_str(), _port);
@@ -66,28 +74,43 @@ void MqttBridge::setTopic(const String &topic) {
 }
 
 bool MqttBridge::ensureConnected() {
+#ifdef MQTT_NET_EXTERNAL
+  if (!mqttNetReady()) return false;   // no link / no IP address yet
+#else
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("MqttBridge: WiFi not connected, skipping MQTT attempt");
     return false;
   }
+#endif
   if (_mqtt.connected()) return true;
 
   uint32_t now = millis();
-  if (now - _last_reconnect_attempt < 300) return false;  // throttle retries to every 300ms
+  if (_last_reconnect_attempt != 0 && now - _last_reconnect_attempt < MQTT_RECONNECT_INTERVAL_MS) return false;
+                                                             // throttle retries to every 300ms on WiFi
                                                              // (was 5000ms - the root cause of the
                                                              // reconnect cycle is still unknown, but
                                                              // reconnects succeed instantly every time,
                                                              // so shortening this window minimizes the
                                                              // gap during which incoming mesh packets
                                                              // would be lost)
-  _last_reconnect_attempt = now;
+  _last_reconnect_attempt = now ? now : 1;   // 0 means "retry at once" (see the setters)
 
   Serial.printf("MqttBridge: connecting to %s:%d (state before=%d)...\n", _server.c_str(), _port, _mqtt.state());
+#ifdef MQTT_NET_EXTERNAL
+  mqttNetClient().stop();  // release any half-open socket from a previous failed attempt
+  bool ok = _mqtt.connect(MQTT_CLIENT_ID);
+  Serial.printf("MqttBridge: connect() returned %d, state after=%d, free heap=%u\n",
+                (int)ok, _mqtt.state(), ESP.getFreeHeap());
+#else
   _wifiClient.stop();  // ensure any half-open socket from a previous failed attempt is
                         // fully released before opening a new one
   bool ok = _mqtt.connect(MQTT_CLIENT_ID);
   Serial.printf("MqttBridge: connect() returned %d, state after=%d, WiFi RSSI=%d, free heap=%u\n",
                 (int)ok, _mqtt.state(), WiFi.RSSI(), ESP.getFreeHeap());
+#endif
+#ifdef MQTT_NET_EXTERNAL
+  if (ok) _last_status_publish = 0;   // announce ourselves right after every (re)connection
+#endif
   return ok;
 }
 
@@ -105,8 +128,12 @@ void MqttBridge::loop() {
     _mqtt.loop();
 
     uint32_t now = millis();
+#ifdef MQTT_NET_EXTERNAL
+    if (_last_status_publish == 0 || now - _last_status_publish > 60000) {  // on connect, then every 60s
+#else
     if (now - _last_status_publish > 60000) {  // every 60s
-      _last_status_publish = now;
+#endif
+      _last_status_publish = now ? now : 1;
       publishStatus();
     }
   }
@@ -123,8 +150,8 @@ void MqttBridge::publishStatus() {
   char json[260];
   snprintf(json, sizeof(json),
            "{\"status\":\"online\",\"origin\":\"%s\",\"origin_id\":\"%s\","
-           "\"firmware\":\"%s\",\"client_version\":\"on6dp-heltec-v4\"}",
-           _node_prefs->node_name, MQTT_CLIENT_ID, MQTT_FIRMWARE_LABEL);
+           "\"firmware\":\"%s\",\"client_version\":\"%s\"}",
+           _node_prefs->node_name, MQTT_CLIENT_ID, MQTT_FIRMWARE_LABEL, MQTT_CLIENT_VERSION);
 
   bool ok = _mqtt.publish(topic, json);
   Serial.printf("MqttBridge: status published to %s, ok=%d\n", topic, (int)ok);
@@ -171,6 +198,7 @@ void MqttBridge::publish(mesh::Packet *packet, const char *dir, float score, int
              (int)packet->getSNR(), rssi, (int)(score * 1000), hash_hex, raw_hex);
 
     bool ok = _mqtt.publish(_topic.c_str(), json);
+    if (ok) _n_published++; else _n_publish_failed++;
     Serial.printf("MqttBridge: publish %s at t=%lu ms, json_len=%d, ok=%d, state=%d\n",
                   dir, millis(), (int)strlen(json), (int)ok, _mqtt.state());
     free(json);

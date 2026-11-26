@@ -24,6 +24,12 @@
 #define WITH_BRIDGE
 #endif
 
+// ON6DP: MQTT observer bridge (publishes every RX/TX packet to an MQTT broker)
+#ifdef WITH_MQTT_BRIDGE
+#include "helpers/bridges/MqttBridge.h"
+#define WITH_BRIDGE
+#endif
+
 #include <helpers/AdvertDataHelpers.h>
 #include <helpers/ArduinoHelpers.h>
 #include <helpers/ClientACL.h>
@@ -118,6 +124,8 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   RS232Bridge bridge;
 #elif defined(WITH_ESPNOW_BRIDGE)
   ESPNowBridge bridge;
+#elif defined(WITH_MQTT_BRIDGE)
+  MqttBridge bridge;
 #endif
 
   void putNeighbour(const mesh::Identity& id, uint32_t timestamp, float snr);
@@ -248,6 +256,10 @@ public:
     bridge.end();
     bridge.begin();
   }
+#endif
+
+#if defined(WITH_MQTT_BRIDGE)
+  MqttBridge& getMqttBridge() { return bridge; }   // status access for on-device UI
 #endif
 
   // To check if there is pending work

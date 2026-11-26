@@ -4,8 +4,20 @@
 
 #ifdef WITH_MQTT_BRIDGE
 
-#include <WiFi.h>
 #include <PubSubClient.h>
+
+// Transport selection:
+//  - default: WiFi (WiFiClient), exactly as before
+//  - MQTT_NET_EXTERNAL: the board variant supplies the TCP client (e.g. a
+//    W5500 Ethernet client) through the two functions below, so this bridge
+//    does not depend on any particular network library.
+#ifdef MQTT_NET_EXTERNAL
+  #include <Client.h>
+  Client& mqttNetClient();   // TCP client used for the MQTT connection
+  bool mqttNetReady();       // true when the network link is up and has an IP address
+#else
+  #include <WiFi.h>
+#endif
 #include <Preferences.h>
 
 #ifndef MQTT_SERVER
@@ -33,10 +45,24 @@
 #ifndef MQTT_FIRMWARE_LABEL
   #define MQTT_FIRMWARE_LABEL FIRMWARE_VERSION
 #endif
+// Free-form label for the "client_version" field of the status message.
+#ifndef MQTT_CLIENT_VERSION
+  #define MQTT_CLIENT_VERSION "on6dp-heltec-v4"
+#endif
+// Minimum delay between two connection attempts. Over WiFi a failed attempt
+// returns at once (300 ms is fine); over a wired W5500 an unreachable broker
+// blocks the main loop for the whole TCP timeout, so retries are spaced out.
+#ifndef MQTT_RECONNECT_INTERVAL_MS
+  #ifdef MQTT_NET_EXTERNAL
+    #define MQTT_RECONNECT_INTERVAL_MS 15000
+  #else
+    #define MQTT_RECONNECT_INTERVAL_MS 300
+  #endif
+#endif
 
 /**
  * @brief Bridge implementation that publishes observed mesh packets to an MQTT
- *        broker over WiFi.
+ *        broker over WiFi (or over a board-supplied client, see MQTT_NET_EXTERNAL).
  *
  * This is an OBSERVER bridge, not a two-way relay like RS232Bridge/ESPNowBridge:
  * onPacketReceived() is intentionally a no-op, so nothing coming from MQTT is
@@ -78,8 +104,17 @@ public:
   void setPort(int port);
   void setTopic(const String &topic);
 
+  // Live status, for on-device displays.
+  bool isConnected() { return _initialized && _mqtt.connected(); }
+  uint32_t getPublishCount() const { return _n_published; }
+  uint32_t getPublishFailCount() const { return _n_publish_failed; }
+
 private:
+#ifndef MQTT_NET_EXTERNAL
   WiFiClient _wifiClient;
+#endif
+  uint32_t _n_published = 0;
+  uint32_t _n_publish_failed = 0;
   PubSubClient _mqtt;
   Preferences _store;
   NodePrefs *_node_prefs;

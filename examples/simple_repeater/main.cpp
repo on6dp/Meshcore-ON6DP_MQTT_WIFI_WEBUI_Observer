@@ -4,8 +4,18 @@
 #include "MyMesh.h"
 
 #ifdef DISPLAY_CLASS
-  #include "UITask.h"
-  static UITask ui_task(board, display);
+  #ifdef M5CORE_UI
+    // ON6DP: colour screen + 3 buttons of the M5Stack Core
+    #include "M5CoreUITask.h"
+    static M5CoreUITask ui_task(board, display);
+  #else
+    #include "UITask.h"
+    static UITask ui_task(board, display);
+  #endif
+#endif
+
+#ifdef WITH_M5_LAN
+  #include <M5CoreLan.h>   // W5500 Ethernet (LAN Module 13.2)
 #endif
 
 #ifdef ETHERNET_ENABLED
@@ -104,6 +114,10 @@ void setup() {
 
   sensors.begin();
 
+#ifdef WITH_M5_LAN
+  m5lan::begin();   // hardware detection only; DHCP is done from loop()
+#endif
+
   the_mesh.begin(fs);
 
 #ifdef DISPLAY_CLASS
@@ -185,6 +199,9 @@ void loop() {
   }
 #endif
 
+#ifdef WITH_M5_LAN
+  m5lan::loop();
+#endif
   the_mesh.loop();
   sensors.loop();
 #ifdef DISPLAY_CLASS
