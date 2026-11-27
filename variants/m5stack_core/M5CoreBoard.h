@@ -26,13 +26,13 @@
 
 // ---- LAN Module 13.2 (selected with the module's jumper caps) ----
 #ifndef P_ETH_CS
-  #define P_ETH_CS   15     // M5-Bus pin 23
+  #define P_ETH_CS   5      // factory jumper position
 #endif
 #ifndef P_ETH_RST
-  #define P_ETH_RST  13     // M5-Bus pin 22
+  #define P_ETH_RST  0      // factory jumper position
 #endif
 #ifndef P_ETH_INT
-  #define P_ETH_INT  34     // M5-Bus pin 26 (not used by the firmware, W5500 is polled)
+  #define P_ETH_INT  35     // factory jumper position (not used by the firmware, W5500 is polled)
 #endif
 
 // ---- Module13.2 LoRa-1262: M5IOE1 I/O expander (I2C) ----

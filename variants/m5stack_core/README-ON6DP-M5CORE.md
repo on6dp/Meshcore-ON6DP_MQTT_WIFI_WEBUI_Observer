@@ -7,36 +7,45 @@ Variante ON6DP pour le **M5Stack Core Basic / Gray / Fire** (ESP32, modèle à 3
 - **Écran couleur 320x240** avec 4 pages et **3 boutons**.
 - **Heure par NTP** dès que le réseau est disponible.
 
-> ⚠️ Ce code n'a pas encore été compilé ni testé sur le matériel. La première compilation peut demander de petites corrections.
+> ⚠️ Firmware en cours de mise au point : compilation, écran, boutons et radio validés sur un Core Basic ; passerelle Ethernet / MQTT encore en test.
 
 ## 1. Réglage des modules
 
-Tout partage le bus SPI du Core (SCK=G18, MISO=G19, MOSI=G23). Chaque module doit avoir **ses propres lignes** :
+Tout partage le bus SPI du Core (SCK=G18, MISO=G19, MOSI=G23). Chaque module doit avoir **ses propres lignes**. Le firmware est réglé pour que le module LAN reste **en configuration d'usine** : seul le module LoRa est à régler.
 
-| Signal | Broche M5-Bus | GPIO du Basic | Réglage |
-|---|---|---|---|
-| LoRa NSS | 20 | G5 | DIP SW1 du module LoRa |
-| LoRa BUSY | 4 | G36 | DIP SW1 du module LoRa |
-| LoRa IRQ | 2 | G35 | DIP SW3 du module LoRa |
-| Expandeur M5IOE1 | 17 / 18 | G21 / G22 | DIP SW2 : A=0, B=0 (adresse 0x74) |
-| LAN CS | 23 | G15 | cavalier du module LAN |
-| LAN RST | 22 | G13 | cavalier du module LAN |
-| LAN INT | 26 | G34 | cavalier du module LAN |
+**Module LoRa** — mettre sur ON les DIP switches **4, 6 et 10**, tous les autres sur OFF :
 
-Si la sérigraphie de tes modules impose une autre combinaison, adapte les lignes `-D P_LORA_*` et `-D P_ETH_*` dans `variants/m5stack_core/platformio.ini`.
+| Signal | Switch | GPIO du Core |
+|---|---|---|
+| NSS | 4 | G15 |
+| BUSY | 6 | G36 |
+| IRQ | 10 | G34 |
+| Adresse de l'expandeur M5IOE1 | bloc A/B : A=0, B=0 | 0x74 (I2C sur G21 / G22) |
 
-Choix possibles sur le M5-Bus :
+**Module LAN** — cavaliers en position d'usine (premier choix de la colonne « Core » imprimée au dos) :
 
-- **LoRa NSS** : broche 20 (G5), 21 (G12), 23 (G15), 24 (G0)
-- **LoRa BUSY** : broche 4 (G36), 8 (G25), 19 (G2), 22 (G13)
-- **LoRa IRQ** : broche 2 (G35), 10 (G26), 26 (G34)
-- **LAN CS** : broche 19 (G2), 20 (G5), 23 (G15)
-- **LAN RST** : broche 22 (G13), 24 (G0)
-- **LAN INT** : broche 2 (G35), 26 (G34)
+| Signal | GPIO du Core |
+|---|---|
+| CS | G5 |
+| RST | G0 |
+| INT | G35 |
 
-À éviter sur le Basic : **G25** (haut-parleur), **G12** et **G0** (broches lues au démarrage de l'ESP32). Les deux modules ne doivent jamais utiliser la même broche, en particulier **IRQ LoRa et INT LAN** qui sont toutes deux sur la broche 2 dans les exemples M5Stack.
+Avec tous les DIP switches du module LoRa sur OFF (état à la livraison), la radio n'est reliée à rien et le démarrage reste bloqué sur « Please wait ».
 
-**Alimentation** : utilise le jack 9–24 V du module LAN. **Visse l'antenne avant de mettre sous tension.**
+Pour une autre combinaison, adapte les lignes `-D P_LORA_*` et `-D P_ETH_*` dans `variants/m5stack_core/platformio.ini`. Choix proposés par les modules, colonne « Core » :
+
+| Module | Signal | Choix |
+|---|---|---|
+| LoRa | NSS | switch 1 = G0, 2 = G5, 3 = G12, 4 = G15 |
+| LoRa | BUSY | switch 5 = G2, 6 = G36, 7 = G13, 8 = G25 |
+| LoRa | IRQ | switch 9 = G35, 10 = G34, 11 = G26 |
+| LAN | CS | G5 ou G15 |
+| LAN | RST | G0 ou G13 |
+| LAN | INT | G35 ou G34 |
+
+Un seul switch sur ON par signal. Les deux modules ne doivent jamais utiliser la même broche. À éviter pour la radio : **G25** (haut-parleur) et **G12** (broche lue au démarrage de l'ESP32).
+
+**Alimentation** : l'USB suffit pour les essais ; pour l'installation définitive, utilise le jack 9–24 V du module LAN. **Visse l'antenne avant de mettre sous tension.**
 
 ## 2. Compilation et flash
 
@@ -86,8 +95,8 @@ Les valeurs sont enregistrées (NVS) et appliquées sans redémarrage.
 
 | Message | Cause probable |
 |---|---|
-| `M5IOE1 expander not answering at 0x74` | DIP SW2 du module LoRa pas sur A=0, B=0 |
-| `ERROR: radio init failed: -2` | NSS / BUSY ne correspondent pas aux DIP switches |
-| Radio OK mais rien reçu ni émis | IRQ (SW3) ne correspond pas à `P_LORA_DIO_1` |
+| `M5IOE1 expander not answering at 0x74` | bloc A/B du module LoRa pas sur A=0, B=0 |
+| `ERROR: radio init failed: -2`, écran bloqué sur « Please wait » | DIP switches du LoRa mal réglés, ou conflit de broches avec le module LAN |
+| Radio OK mais rien reçu ni émis | switch IRQ ne correspond pas à `P_LORA_DIO_1` |
 | `ETH: no W5500 found` | cavalier CS du module LAN ≠ `P_ETH_CS` |
 | Couleurs de l'écran inversées | ajouter `-D M5_LCD_INVERT=1` (ou `=0`) |
