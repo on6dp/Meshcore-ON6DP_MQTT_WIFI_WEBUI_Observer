@@ -22,6 +22,7 @@ static const char* const key_ssid[WIFI_SLOTS] = { "ssid", "ssid2" };
 static const char* const key_pwd[WIFI_SLOTS]  = { "pwd", "pwd2" };
 static int      cur = 0;                 // slot in use / being tried
 static bool     started = false;
+static bool     ap_active = false;        // configuration access point running
 static bool     was_connected = false;
 static bool     time_ok = false;
 static volatile bool sntp_done = false;   // set by the SNTP task when a server has answered
@@ -144,10 +145,36 @@ Client& client() {
   return wifi_client;
 }
 
+bool startAccessPoint(const char* ap_ssid, const char* ap_pwd) {
+  stopRadio();
+  WiFi.persistent(false);
+  WiFi.mode(WIFI_AP);
+  WiFi.setSleep(false);
+  ap_active = WiFi.softAP(ap_ssid, ap_pwd);
+  if (!ap_active) WiFi.mode(WIFI_OFF);
+  Serial.printf("WIFI: access point '%s' %s\n", ap_ssid, ap_active ? "started" : "FAILED");
+  return ap_active;
+}
+
+void stopAccessPoint() {
+  if (!ap_active) return;
+  WiFi.softAPdisconnect(true);
+  WiFi.mode(WIFI_OFF);
+  ap_active = false;
+  started = false;
+  next_check = millis() + 1000;
+  Serial.println("WIFI: access point stopped");
+}
+
+bool accessPointActive() { return ap_active; }
+int  accessPointClients() { return ap_active ? WiFi.softAPgetStationNum() : 0; }
+
 void loop(bool wanted) {
   uint32_t now = millis();
   if ((int32_t)(now - next_check) < 0) return;
   next_check = now + 500;
+
+  if (ap_active) return;   // configuration mode owns the radio
 
   // the OTA update ("start ota") runs its own access point: leave it alone
   wifi_mode_t mode = WiFi.getMode();
@@ -210,6 +237,10 @@ namespace m5wifi {
   void statusText(char* dest, size_t len) { snprintf(dest, len, "desactive"); }
   void setSsid(int, const char*) {}
   void setPassword(int, const char*) {}
+  bool startAccessPoint(const char*, const char*) { return false; }
+  void stopAccessPoint() {}
+  bool accessPointActive() { return false; }
+  int  accessPointClients() { return 0; }
 }
 
 #endif

@@ -64,6 +64,7 @@ L'environnement `M5Stack_Core_repeater` donne le même repeater sans le module L
 |---|---|---|
 | **A** (gauche) | Page suivante | Page précédente |
 | **B** (milieu) | Advert local (zero-hop) | Advert flood |
+| **B** sur la page Réseau | rappel à l'écran | **Mode configuration** |
 | **C** (droite) | Luminosité : forte → faible → éteint | Redémarrage |
 
 L'écran s'éteint après 5 minutes sans appui (`-D M5UI_AUTO_OFF_SECS=0` pour le garder allumé). Le premier appui le rallume.
@@ -118,7 +119,14 @@ set wifi2.pwd MotDePasseTelephone
 
 **Sur batterie** : la radio à 22 dBm, le WiFi et l'écran consomment beaucoup. Pour un usage mobile, baisse la puissance (`set tx 14` par exemple) et laisse l'écran s'éteindre.
 
-Pas de page web de configuration dans cette version.
+**Mode configuration (WiFi et MQTT depuis un téléphone ou un PC)**
+
+1. Va sur la page **Réseau** de l'écran : le bouton du milieu s'appelle alors **CONFIG**.
+2. Appui long sur ce bouton. Le Core ouvre son propre réseau WiFi `ON6DP-M5` et affiche un mot de passe à 8 chiffres, différent à chaque fois.
+3. Connecte ton téléphone ou ton PC à ce réseau, puis ouvre `http://192.168.4.1`.
+4. Saisis les deux réseaux WiFi et les réglages MQTT, puis **Enregistrer**. Le mode se ferme tout seul.
+
+Le mode se ferme aussi par un appui sur le bouton du milieu (QUITTER), ou après 10 minutes sans activité. La passerelle par câble continue de fonctionner pendant ce temps.
 
 ## 7. Dépannage (console série 115200)
 

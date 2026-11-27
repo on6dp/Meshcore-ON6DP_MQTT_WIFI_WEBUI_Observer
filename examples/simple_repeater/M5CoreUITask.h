@@ -43,7 +43,8 @@ class M5CoreUITask {
   void handleButtons();
   void render();
   void drawHeader(const char* page_title);
-  void drawFooter();
+  void drawFooter(const char* left, const char* middle, const char* right);
+  void pagePortal();
   void drawRow(int row, const char* label, const char* value, ColorVal value_color);
   void drawRow(int row, const char* label, const char* value);
   void pageStatus();

@@ -6,6 +6,7 @@
 #include <esp_timer.h>
 #include <M5CoreLan.h>
 #include <M5CoreWifi.h>
+#include "M5CorePortal.h"
 
 extern MyMesh the_mesh;
 
@@ -114,6 +115,24 @@ void M5CoreUITask::handleButtons() {
     return;
   }
 
+  if (m5portal::active()) {   // configuration mode: the middle button leaves it
+    if (b != M5CoreButton::EVENT_NONE) {
+      m5portal::stop();
+      showToast("Mode config ferme");
+    }
+    return;
+  }
+
+  // "Reseau" page: the middle button opens the configuration mode instead of sending an advert
+  if (_page == 2 && b != M5CoreButton::EVENT_NONE) {
+    if (b == M5CoreButton::EVENT_LONG_PRESS) {
+      if (!m5portal::start()) showToast("WiFi indisponible");
+    } else {
+      showToast("Appui long = mode config");
+    }
+    return;
+  }
+
   // A: page navigation
   if (a == M5CoreButton::EVENT_CLICK) {
     _page = (_page + 1) % NUM_PAGES;
@@ -176,12 +195,13 @@ void M5CoreUITask::drawHeader(const char* page_title) {
   _display->drawTextRightAlign(_display->width() - LABEL_X, 5, tmp);
 }
 
-void M5CoreUITask::drawFooter() {
-  static const char* labels[3] = { "PAGE", "ADVERT", "ECRAN" };
+void M5CoreUITask::drawFooter(const char* left, const char* middle, const char* right) {
+  const char* labels[3] = { left, middle, right };
   static const int centers[3] = { 65, 160, 255 };   // above the three physical buttons
 
   _display->setTextSize(2);
   for (int i = 0; i < 3; i++) {
+    if (!labels[i][0]) continue;   // no function on this button
     _display->setColor(COL_BTN);
     _display->fillRoundRect(centers[i] - 46, FOOTER_Y, 92, FOOTER_H, 8);
     _display->setColor(UIColor::secondary_txt);
@@ -374,19 +394,51 @@ void M5CoreUITask::pageNeighbours() {
   }
 }
 
+// Configuration mode: how to reach the setup page
+void M5CoreUITask::pagePortal() {
+  char tmp[40];
+
+  _display->setColor(UIColor::title_bkg);
+  _display->fillRect(0, 0, _display->width(), HEADER_H);
+  _display->setTextSize(2);
+  _display->setColor(UIColor::title_txt);
+  _display->drawTextCentered(_display->width() / 2, 5, "Mode configuration");
+
+  _display->setColor(UIColor::secondary_txt);
+  _display->drawTextCentered(_display->width() / 2, 36, "1. Connecte-toi au WiFi :");
+  drawRow(1, "Reseau", m5portal::apName(), COL_GREEN);
+  drawRow(2, "Mot passe", m5portal::apPassword(), COL_GREEN);
+
+  _display->setTextSize(2);
+  _display->setColor(UIColor::secondary_txt);
+  _display->drawTextCentered(_display->width() / 2, ROW_Y0 + 3 * ROW_STEP + 6, "2. Ouvre l'adresse :");
+  _display->setColor(UIColor::primary_txt);
+  _display->drawTextCentered(_display->width() / 2, ROW_Y0 + 4 * ROW_STEP + 8, "http://192.168.4.1");
+
+  snprintf(tmp, sizeof(tmp), "%d appareil(s) connecte(s)", m5wifi::accessPointClients());
+  _display->setColor(UIColor::secondary_txt);
+  _display->drawTextCentered(_display->width() / 2, ROW_Y0 + 6 * ROW_STEP + 4, tmp);
+
+  drawFooter("", "QUITTER", "");
+}
+
 void M5CoreUITask::render() {
   if (millis() - _started_at < BOOT_SCREEN_MILLIS) {
     pageBoot();
     return;
   }
 
-  switch (_page) {
-    case 0: pageStatus(); break;
-    case 1: pageRadio(); break;
-    case 2: pageNetwork(); break;
-    default: pageNeighbours(); break;
+  if (m5portal::active()) {
+    pagePortal();
+  } else {
+    switch (_page) {
+      case 0: pageStatus(); break;
+      case 1: pageRadio(); break;
+      case 2: pageNetwork(); break;
+      default: pageNeighbours(); break;
+    }
+    drawFooter("PAGE", _page == 2 ? "CONFIG" : "ADVERT", "ECRAN");
   }
-  drawFooter();
 
   if (_toast[0] && (long)(millis() - _toast_until) < 0) {
     int w = 280, h = 44;
@@ -405,6 +457,8 @@ void M5CoreUITask::render() {
 
 void M5CoreUITask::loop() {
   handleButtons();
+  m5portal::loop();
+  if (m5portal::active()) _last_activity = millis();   // keep the screen on while configuring
 
   if (_reboot_at && (long)(millis() - _reboot_at) > 0) {
     _board->reboot();

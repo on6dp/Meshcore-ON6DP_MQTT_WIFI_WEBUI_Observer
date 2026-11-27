@@ -31,4 +31,11 @@ namespace m5wifi {
 #ifdef WITH_M5_WIFI
   Client& client();                // TCP client for the MQTT bridge
 #endif
+
+  // Configuration mode: the Core opens its own WPA2 access point (address 192.168.4.1)
+  // so that a phone or PC can reach the setup page. Normal WiFi use is paused meanwhile.
+  bool startAccessPoint(const char* ap_ssid, const char* ap_pwd);
+  void stopAccessPoint();
+  bool accessPointActive();
+  int  accessPointClients();
 }
