@@ -1,4 +1,5 @@
 #include "M5CoreLan.h"
+#include "M5CoreWifi.h"
 
 #ifdef WITH_M5_LAN
 
@@ -39,6 +40,20 @@ static uint32_t next_link_check = 0;
 static uint32_t next_ip_attempt = 0;
 static uint32_t next_ntp_at = 0;
 static uint32_t next_detect_at = 0;
+static uint32_t no_cable_since = 0;     // 0 = cable present
+
+#ifndef WIFI_FALLBACK_DELAY_MS
+  #define WIFI_FALLBACK_DELAY_MS 4000   // time without a wired link before WiFi is started
+#endif
+
+static bool ethReady() { return hw_ok && link_up && ip_ok; }
+
+// WiFi is wanted only while there is no wired link (a cable waiting for its
+// DHCP answer still counts as wired).
+static bool wifiWanted() {
+  if (hw_ok && link_up) return false;
+  return no_cable_since != 0 && (millis() - no_cable_since) >= WIFI_FALLBACK_DELAY_MS;
+}
 
 // NTP exchange in progress
 static EthernetUDP ntp_udp;
@@ -46,6 +61,8 @@ static bool     ntp_waiting = false;
 static uint32_t ntp_sent_at = 0;
 
 // ---- transport used by MqttBridge (see MQTT_NET_EXTERNAL) ----
+// Returns the client of the network currently in use; the bridge notices when
+// the answer changes and reconnects over the new one.
 Client& mqttNetClient() {
   static EthernetClient client;
   static bool configured = false;
@@ -53,11 +70,14 @@ Client& mqttNetClient() {
     client.setConnectionTimeout(ETH_TCP_TIMEOUT_MS);
     configured = true;
   }
+#ifdef WITH_M5_WIFI
+  if (!ethReady() && m5wifi::connected()) return m5wifi::client();
+#endif
   return client;
 }
 
 bool mqttNetReady() {
-  return hw_ok && link_up && ip_ok;
+  return ethReady() || m5wifi::connected();
 }
 
 namespace m5lan {
@@ -65,10 +85,17 @@ namespace m5lan {
 bool hasHardware() { return hw_ok; }
 bool linkUp()      { return hw_ok && link_up; }
 bool hasIP()       { return hw_ok && link_up && ip_ok; }
-bool timeSynced()  { return time_ok; }
+bool timeSynced()  { return time_ok || m5wifi::timeSynced(); }
+bool online()      { return ethReady() || m5wifi::connected(); }
+bool viaWifi()     { return !ethReady() && m5wifi::connected(); }
 
 IPAddress localIP() {
   return hasIP() ? Ethernet.localIP() : IPAddress(0, 0, 0, 0);
+}
+
+IPAddress activeIP() {
+  if (ethReady()) return Ethernet.localIP();
+  return m5wifi::localIP();
 }
 
 const char* statusText() {
@@ -87,6 +114,8 @@ static bool detectChip() {
 
 void begin() {
   esp_read_mac(mac, ESP_MAC_ETH);   // unique, derived from the ESP32 factory MAC
+  no_cable_since = millis() | 1;    // no wired link known yet
+  m5wifi::begin();
 
   // the reset pulse was already done by M5CoreBoard::begin()
   Ethernet.init(P_ETH_CS);
@@ -181,6 +210,8 @@ static void ntpPoll() {
 void loop() {
   uint32_t now = millis();
 
+  m5wifi::loop(wifiWanted());
+
   if (!hw_ok) {   // keep probing: the module may answer late after power-up
     if ((int32_t)(now - next_detect_at) < 0) return;
     next_detect_at = now + 5000;
@@ -198,8 +229,10 @@ void loop() {
       Serial.printf("ETH: link %s\n", up ? "UP" : "DOWN");
       if (!up) {
         ip_ok = false;
+        no_cable_since = now | 1;
         if (ntp_waiting) { ntp_udp.stop(); ntp_waiting = false; }
       } else {
+        no_cable_since = 0;
         next_ip_attempt = now + 500;   // let the link settle
       }
     }
@@ -243,7 +276,10 @@ namespace m5lan {
   bool linkUp() { return false; }
   bool hasIP() { return false; }
   bool timeSynced() { return false; }
+  bool online() { return false; }
+  bool viaWifi() { return false; }
   IPAddress localIP() { return IPAddress(0, 0, 0, 0); }
+  IPAddress activeIP() { return IPAddress(0, 0, 0, 0); }
   const char* statusText() { return "desactive"; }
 }
 

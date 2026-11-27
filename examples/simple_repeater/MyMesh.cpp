@@ -1,4 +1,8 @@
 #include "MyMesh.h"
+
+#if defined(WITH_M5_WIFI)
+  #include <M5CoreWifi.h>   // ON6DP: WiFi fallback of the M5Stack Core variant
+#endif
 #include <algorithm>
 
 /* ------------------------------ Config -------------------------------- */
@@ -1287,6 +1291,22 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
       sendNodeDiscoverReq();
       strcpy(reply, "OK - Discover sent");
     }
+#if defined(WITH_M5_WIFI)
+  } else if (memcmp(command, "get wifi.ssid", 13) == 0) {
+    strcpy(reply, m5wifi::configured() ? m5wifi::ssid() : "(none)");
+  } else if (memcmp(command, "set wifi.ssid", 13) == 0) {
+    const char* v = command + 13;
+    while (*v == ' ') v++;
+    m5wifi::setSsid(v);            // empty value = WiFi disabled
+    strcpy(reply, *v ? "OK" : "OK - WiFi disabled");
+  } else if (memcmp(command, "set wifi.pwd", 12) == 0) {
+    const char* v = command + 12;
+    while (*v == ' ') v++;
+    m5wifi::setPassword(v);
+    strcpy(reply, "OK");
+  } else if (memcmp(command, "get wifi.status", 15) == 0) {
+    m5wifi::statusText(reply, 60);
+#endif
 #if defined(WITH_MQTT_BRIDGE)
   } else if (memcmp(command, "get mqtt.server", 15) == 0) {
     strcpy(reply, bridge.getServer().c_str());

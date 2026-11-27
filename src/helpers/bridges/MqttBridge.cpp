@@ -76,6 +76,16 @@ void MqttBridge::setTopic(const String &topic) {
 bool MqttBridge::ensureConnected() {
 #ifdef MQTT_NET_EXTERNAL
   if (!mqttNetReady()) return false;   // no link / no IP address yet
+  Client* net = &mqttNetClient();
+  if (net != _net_client) {            // first use, or the board switched to another network
+    if (_net_client) {
+      _net_client->stop();             // the old link is gone: just drop the socket
+      Serial.println("MqttBridge: network changed, reconnecting");
+    }
+    _mqtt.setClient(*net);
+    _net_client = net;
+    _last_reconnect_attempt = 0;       // connect at once
+  }
 #else
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("MqttBridge: WiFi not connected, skipping MQTT attempt");

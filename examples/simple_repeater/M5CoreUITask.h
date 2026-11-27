@@ -7,14 +7,26 @@
 #ifdef M5CORE_UI
 
 #include <helpers/CommonCLI.h>
-#include <helpers/ui/MomentaryButton.h>
 #include "target.h"
+
+// Debounced push button (active low). A press only counts once the line has been
+// stable for 25 ms: GPIO39 (button A) picks up very short glitches while WiFi is on.
+class M5CoreButton {
+  int8_t _pin;
+  bool _raw = false, _stable = false, _long_fired = false;
+  unsigned long _changed_at = 0, _down_at = 0;
+public:
+  enum { EVENT_NONE = 0, EVENT_CLICK, EVENT_LONG_PRESS };
+  explicit M5CoreButton(int8_t pin) : _pin(pin) { }
+  void begin();
+  int check();
+};
 
 class M5CoreUITask {
   mesh::MainBoard* _board;
   M5CoreDisplay*   _display;
   NodePrefs*       _node_prefs = NULL;
-  MomentaryButton  _btnA, _btnB, _btnC;
+  M5CoreButton     _btnA, _btnB, _btnC;
 
   char _version[24];
   char _build_date[16];

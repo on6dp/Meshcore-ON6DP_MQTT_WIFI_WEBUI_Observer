@@ -112,6 +112,8 @@ public:
 private:
 #ifndef MQTT_NET_EXTERNAL
   WiFiClient _wifiClient;
+#else
+  Client* _net_client = nullptr;   // transport in use (it may change, e.g. Ethernet <-> WiFi)
 #endif
   uint32_t _n_published = 0;
   uint32_t _n_publish_failed = 0;

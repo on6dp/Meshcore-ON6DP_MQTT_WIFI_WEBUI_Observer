@@ -4,6 +4,7 @@ Variante ON6DP pour le **M5Stack Core Basic / Gray / Fire** (ESP32, modèle à 3
 
 - **Repeater MeshCore** sur le Module13.2 LoRa-1262 (SX1262).
 - **Passerelle MQTT « observer »** par le câble réseau (W5500), même format de messages que le firmware Heltec V4 (compatible CoreScope).
+- **WiFi de secours** : sans câble (ou sans module LAN dans la pile), la passerelle passe automatiquement par le WiFi.
 - **Écran couleur 320x240** avec 4 pages et **3 boutons**.
 - **Heure par NTP** dès que le réseau est disponible.
 
@@ -71,7 +72,7 @@ L'écran s'éteint après 5 minutes sans appui (`-D M5UI_AUTO_OFF_SECS=0` pour l
 
 1. **État** : fréquence, modulation, puissance, uptime, heure UTC, adresse IP, MQTT, version.
 2. **Radio** : paquets reçus / émis, erreurs, flood / direct, RSSI / SNR, bruit, temps d'émission.
-3. **Réseau** : lien Ethernet, IP, NTP, broker, port, état MQTT, messages publiés, topic.
+3. **Réseau** : lien Ethernet, WiFi, IP, NTP, broker, état MQTT, messages publiés, topic.
 4. **Voisins** : derniers repeaters entendus (identifiant, ancienneté, SNR).
 
 ## 5. Commandes CLI ajoutées au repeater
@@ -81,15 +82,37 @@ get mqtt.server      set mqtt.server <hôte>
 get mqtt.port        set mqtt.port <port>
 get mqtt.topic       set mqtt.topic <topic>
 get mqtt.status
+
+get wifi.ssid        set wifi.ssid <nom du réseau>
+                     set wifi.pwd <mot de passe>
+get wifi.status
 ```
 
 Les valeurs sont enregistrées (NVS) et appliquées sans redémarrage.
 
 ## 6. Réseau
 
+**Câble (prioritaire)**
+
 - **DHCP** par défaut. IP fixe : décommente `ETH_STATIC_IP`, `ETH_GATEWAY`, `ETH_DNS`, `ETH_SUBNET`.
 - Pendant une demande DHCP sans réponse, ou si le broker est injoignable, la boucle principale est bloquée quelques secondes : des paquets radio peuvent être manqués pendant ce temps.
-- Pas de page web de configuration dans cette version (elle repose sur le WiFi dans le firmware Heltec).
+
+**WiFi (secours)**
+
+- À configurer une fois, par la console série ou la console d'administration à distance :
+
+```
+set wifi.ssid MonReseau
+set wifi.pwd MonMotDePasse
+```
+
+- Le WiFi démarre quand aucun câble n'est branché depuis 4 secondes, ou quand le module LAN n'est pas dans la pile. Il s'éteint dès que le câble revient.
+- `set wifi.ssid` sans valeur désactive le WiFi.
+- Les identifiants sont enregistrés dans le Core (NVS), pas dans le dépôt.
+
+**Sur batterie** : la radio à 22 dBm, le WiFi et l'écran consomment beaucoup. Pour un usage mobile, baisse la puissance (`set tx 14` par exemple) et laisse l'écran s'éteindre.
+
+Pas de page web de configuration dans cette version.
 
 ## 7. Dépannage (console série 115200)
 

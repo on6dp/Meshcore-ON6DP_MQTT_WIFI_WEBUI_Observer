@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include <esp_timer.h>
 #include <M5CoreLan.h>
+#include <M5CoreWifi.h>
 
 extern MyMesh the_mesh;
 
@@ -13,6 +14,7 @@ extern MyMesh the_mesh;
   #define M5UI_AUTO_OFF_SECS   300     // backlight off after 5 minutes without a key press (0 = never)
 #endif
 #define LONG_PRESS_MILLIS      800
+#define DEBOUNCE_MILLIS        25
 #define BOOT_SCREEN_MILLIS     3000
 #define TOAST_MILLIS           2500
 #define NUM_PAGES              4
@@ -33,11 +35,38 @@ extern MyMesh the_mesh;
 
 static const uint8_t brightness_steps[] = { 160, 50 };
 
+void M5CoreButton::begin() {
+  pinMode(_pin, INPUT);   // GPIO37..39 are input-only, the Core has external pull-ups
+}
+
+int M5CoreButton::check() {
+  unsigned long now = millis();
+  bool raw = (digitalRead(_pin) == LOW);
+  if (raw != _raw) {
+    _raw = raw;
+    _changed_at = now;
+  }
+
+  if (_raw != _stable && now - _changed_at >= DEBOUNCE_MILLIS) {
+    _stable = _raw;
+    if (_stable) {
+      _down_at = now;
+      _long_fired = false;
+    } else if (!_long_fired) {
+      return EVENT_CLICK;
+    }
+  }
+
+  if (_stable && !_long_fired && now - _down_at >= LONG_PRESS_MILLIS) {
+    _long_fired = true;
+    return EVENT_LONG_PRESS;
+  }
+  return EVENT_NONE;
+}
+
 M5CoreUITask::M5CoreUITask(mesh::MainBoard& board, M5CoreDisplay& display)
   : _board(&board), _display(&display),
-    _btnA(PIN_CORE_BTN_A, LONG_PRESS_MILLIS, true, false, false),
-    _btnB(PIN_CORE_BTN_B, LONG_PRESS_MILLIS, true, false, false),
-    _btnC(PIN_CORE_BTN_C, LONG_PRESS_MILLIS, true, false, false) {
+    _btnA(PIN_CORE_BTN_A), _btnB(PIN_CORE_BTN_B), _btnC(PIN_CORE_BTN_C) {
   _version[0] = 0;
   _build_date[0] = 0;
   _toast[0] = 0;
@@ -74,7 +103,7 @@ void M5CoreUITask::handleButtons() {
   int a = _btnA.check();
   int b = _btnB.check();
   int c = _btnC.check();
-  if (a == BUTTON_EVENT_NONE && b == BUTTON_EVENT_NONE && c == BUTTON_EVENT_NONE) return;
+  if (a == M5CoreButton::EVENT_NONE && b == M5CoreButton::EVENT_NONE && c == M5CoreButton::EVENT_NONE) return;
 
   _last_activity = millis();
   _next_refresh = 0;   // redraw at once
@@ -86,23 +115,23 @@ void M5CoreUITask::handleButtons() {
   }
 
   // A: page navigation
-  if (a == BUTTON_EVENT_CLICK) {
+  if (a == M5CoreButton::EVENT_CLICK) {
     _page = (_page + 1) % NUM_PAGES;
-  } else if (a == BUTTON_EVENT_LONG_PRESS) {
+  } else if (a == M5CoreButton::EVENT_LONG_PRESS) {
     _page = (_page + NUM_PAGES - 1) % NUM_PAGES;
   }
 
   // B: send an advertisement
-  if (b == BUTTON_EVENT_CLICK) {
+  if (b == M5CoreButton::EVENT_CLICK) {
     the_mesh.sendSelfAdvertisement(300, false);
     showToast("Advert local envoye");
-  } else if (b == BUTTON_EVENT_LONG_PRESS) {
+  } else if (b == M5CoreButton::EVENT_LONG_PRESS) {
     the_mesh.sendSelfAdvertisement(300, true);
     showToast("Advert FLOOD envoye");
   }
 
   // C: backlight / reboot
-  if (c == BUTTON_EVENT_CLICK) {
+  if (c == M5CoreButton::EVENT_CLICK) {
     _bright_step++;
     if (_bright_step > sizeof(brightness_steps)) _bright_step = 0;
     if (_bright_step == sizeof(brightness_steps)) {
@@ -111,7 +140,7 @@ void M5CoreUITask::handleButtons() {
       _display->setBrightness(brightness_steps[_bright_step]);
       _display->turnOn();
     }
-  } else if (c == BUTTON_EVENT_LONG_PRESS) {
+  } else if (c == M5CoreButton::EVENT_LONG_PRESS) {
     showToast("Redemarrage...");
     _reboot_at = millis() + 1200;
   }
@@ -216,10 +245,13 @@ void M5CoreUITask::pageStatus() {
     drawRow(4, "Heure", "non reglee", UIColor::warning_txt);
   }
 
-  if (m5lan::hasIP()) {
-    IPAddress ip = m5lan::localIP();
+  if (m5lan::online()) {
+    IPAddress ip = m5lan::activeIP();
     snprintf(tmp, sizeof(tmp), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
-    drawRow(5, "LAN", tmp, COL_GREEN);
+    drawRow(5, m5lan::viaWifi() ? "WiFi" : "LAN", tmp, COL_GREEN);
+  } else if (m5wifi::configured() && !m5lan::linkUp()) {
+    m5wifi::statusText(tmp, sizeof(tmp));
+    drawRow(5, "WiFi", tmp, UIColor::warning_txt);
   } else {
     drawRow(5, "LAN", m5lan::statusText(), UIColor::warning_txt);
   }
@@ -272,20 +304,20 @@ void M5CoreUITask::pageNetwork() {
 
   drawRow(0, "Ethernet", m5lan::statusText(), m5lan::hasIP() ? COL_GREEN : UIColor::warning_txt);
 
-  IPAddress ip = m5lan::localIP();
-  snprintf(tmp, sizeof(tmp), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
-  drawRow(1, "Adr. IP", m5lan::hasIP() ? tmp : "-");
+  m5wifi::statusText(tmp, sizeof(tmp));
+  drawRow(1, "WiFi", tmp, m5wifi::connected() ? COL_GREEN : UIColor::secondary_txt);
 
-  drawRow(2, "Heure NTP", m5lan::timeSynced() ? "synchronisee" : "en attente",
+  IPAddress ip = m5lan::activeIP();
+  snprintf(tmp, sizeof(tmp), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+  drawRow(2, "Adr. IP", m5lan::online() ? tmp : "-");
+
+  drawRow(3, "Heure NTP", m5lan::timeSynced() ? "synchronisee" : "en attente",
           m5lan::timeSynced() ? COL_GREEN : UIColor::warning_txt);
 
 #ifdef WITH_MQTT_BRIDGE
   MqttBridge& mqtt = the_mesh.getMqttBridge();
 
-  drawRow(3, "Broker", mqtt.getServer().c_str());
-
-  snprintf(tmp, sizeof(tmp), "%d", mqtt.getPort());
-  drawRow(4, "Port", tmp);
+  drawRow(4, "Broker", mqtt.getServer().c_str());
 
   if (mqtt.isConnected()) {
     drawRow(5, "MQTT", "connecte", COL_GREEN);
@@ -301,7 +333,7 @@ void M5CoreUITask::pageNetwork() {
   _display->setColor(UIColor::secondary_txt);
   _display->drawTextEllipsized(LABEL_X, ROW_Y0 + 7 * ROW_STEP + 4, _display->width() - 2 * LABEL_X, mqtt.getTopic().c_str());
 #else
-  drawRow(3, "MQTT", "desactive", UIColor::secondary_txt);
+  drawRow(4, "MQTT", "desactive", UIColor::secondary_txt);
 #endif
 }
 
