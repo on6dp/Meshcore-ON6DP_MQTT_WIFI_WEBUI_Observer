@@ -248,7 +248,7 @@ void M5CoreUITask::pageRadio() {
   drawRow(1, "Emis", tmp);
 
   snprintf(tmp, sizeof(tmp), "%u", (unsigned)radio_driver.getPacketsRecvErrors());
-  drawRow(2, "Erreurs RX", tmp);
+  drawRow(2, "Err. RX", tmp);
 
   snprintf(tmp, sizeof(tmp), "rx %u tx %u", (unsigned)the_mesh.getNumRecvFlood(), (unsigned)the_mesh.getNumSentFlood());
   drawRow(3, "Flood", tmp);
@@ -256,7 +256,7 @@ void M5CoreUITask::pageRadio() {
   snprintf(tmp, sizeof(tmp), "rx %u tx %u", (unsigned)the_mesh.getNumRecvDirect(), (unsigned)the_mesh.getNumSentDirect());
   drawRow(4, "Direct", tmp);
 
-  snprintf(tmp, sizeof(tmp), "%d dBm / %.1f dB", (int)radio_driver.getLastRSSI(), radio_driver.getLastSNR());
+  snprintf(tmp, sizeof(tmp), "%d / %.1f dB", (int)radio_driver.getLastRSSI(), radio_driver.getLastSNR());
   drawRow(5, "RSSI/SNR", tmp);
 
   snprintf(tmp, sizeof(tmp), "%d dBm", (int)radio_driver.getNoiseFloor());
@@ -274,7 +274,7 @@ void M5CoreUITask::pageNetwork() {
 
   IPAddress ip = m5lan::localIP();
   snprintf(tmp, sizeof(tmp), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
-  drawRow(1, "Adresse IP", m5lan::hasIP() ? tmp : "-");
+  drawRow(1, "Adr. IP", m5lan::hasIP() ? tmp : "-");
 
   drawRow(2, "Heure NTP", m5lan::timeSynced() ? "synchronisee" : "en attente",
           m5lan::timeSynced() ? COL_GREEN : UIColor::warning_txt);
