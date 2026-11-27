@@ -7,7 +7,7 @@ Variante ON6DP pour le **M5Stack Core Basic / Gray / Fire** (ESP32, modèle à 3
 - **Écran couleur 320x240** avec 4 pages et **3 boutons**.
 - **Heure par NTP** dès que le réseau est disponible.
 
-> ⚠️ Firmware en cours de mise au point. Validé sur un Core Basic : compilation, écran, radio initialisée, Ethernet (DHCP), heure NTP et connexion MQTT. Encore à vérifier : boutons, trafic radio réel et tenue dans la durée.
+> ✅ Validé sur un Core Basic (27/11/2026) : écran et boutons, réception et émission radio, Ethernet (DHCP), heure NTP, publication MQTT visible dans CoreScope. Reste à observer : la tenue dans la durée.
 
 ## 1. Réglage des modules
 
