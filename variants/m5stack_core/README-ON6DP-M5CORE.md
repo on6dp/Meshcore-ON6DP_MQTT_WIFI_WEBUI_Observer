@@ -83,8 +83,10 @@ get mqtt.port        set mqtt.port <port>
 get mqtt.topic       set mqtt.topic <topic>
 get mqtt.status
 
-get wifi.ssid        set wifi.ssid <nom du réseau>
+get wifi.ssid        set wifi.ssid <nom du réseau>      (réseau 1, ex. maison)
                      set wifi.pwd <mot de passe>
+get wifi2.ssid       set wifi2.ssid <nom du réseau>     (réseau 2, ex. téléphone)
+                     set wifi2.pwd <mot de passe>
 get wifi.status
 ```
 
@@ -99,15 +101,19 @@ Les valeurs sont enregistrées (NVS) et appliquées sans redémarrage.
 
 **WiFi (secours)**
 
-- À configurer une fois, par la console série ou la console d'administration à distance :
+- Deux réseaux sont mémorisés, par exemple celui de la maison et le point d'accès du téléphone. À configurer une fois, par la console série ou la console d'administration à distance :
 
 ```
-set wifi.ssid MonReseau
-set wifi.pwd MonMotDePasse
+set wifi.ssid ReseauMaison
+set wifi.pwd MotDePasseMaison
+set wifi2.ssid PointAccesTelephone
+set wifi2.pwd MotDePasseTelephone
 ```
+
+- Le Core essaie les deux réseaux à tour de rôle (12 secondes chacun) jusqu'à ce que l'un réponde. Le point d'accès du téléphone doit être en **2,4 GHz**.
 
 - Le WiFi démarre quand aucun câble n'est branché depuis 4 secondes, ou quand le module LAN n'est pas dans la pile. Il s'éteint dès que le câble revient.
-- `set wifi.ssid` sans valeur désactive le WiFi.
+- `set wifi.ssid` ou `set wifi2.ssid` sans valeur efface le réseau correspondant.
 - Les identifiants sont enregistrés dans le Core (NVS), pas dans le dépôt.
 
 **Sur batterie** : la radio à 22 dBm, le WiFi et l'écran consomment beaucoup. Pour un usage mobile, baisse la puissance (`set tx 14` par exemple) et laisse l'écran s'éteindre.

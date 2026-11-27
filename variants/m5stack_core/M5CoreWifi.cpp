@@ -12,11 +12,15 @@ extern AutoDiscoverRTCClock rtc_clock;
 #ifndef NTP_SERVER
   #define NTP_SERVER "pool.ntp.org"
 #endif
-#define WIFI_RETRY_MS      20000
+#define WIFI_RETRY_MS      12000   // time given to one network before the other one is tried
+#define WIFI_SLOTS         2
 #define NTP_RESYNC_MS      (6UL * 60 * 60 * 1000)
 
-static char     cfg_ssid[33] = "";
-static char     cfg_pwd[65] = "";
+static char     cfg_ssid[WIFI_SLOTS][33] = { "", "" };
+static char     cfg_pwd[WIFI_SLOTS][65] = { "", "" };
+static const char* const key_ssid[WIFI_SLOTS] = { "ssid", "ssid2" };
+static const char* const key_pwd[WIFI_SLOTS]  = { "pwd", "pwd2" };
+static int      cur = 0;                 // slot in use / being tried
 static bool     started = false;
 static bool     was_connected = false;
 static bool     time_ok = false;
@@ -41,15 +45,29 @@ static void stopRadio() {
   waiting_ntp = false;
 }
 
+// Next slot that holds a network, starting after 'from' (returns 'from' when it is the only one).
+static int nextSlot(int from) {
+  for (int i = 1; i <= WIFI_SLOTS; i++) {
+    int s = (from + i) % WIFI_SLOTS;
+    if (cfg_ssid[s][0]) return s;
+  }
+  return from;
+}
+
+static void tryCurrent() {
+  WiFi.begin(cfg_ssid[cur], cfg_pwd[cur]);
+  last_begin = millis();
+  Serial.printf("WIFI: connecting to '%s'\n", cfg_ssid[cur]);
+}
+
 static void startRadio() {
+  if (!cfg_ssid[cur][0]) cur = nextSlot(cur);
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);          // modem sleep causes glitches on GPIO36/39 (radio BUSY line, button A)
   WiFi.setAutoReconnect(true);
-  WiFi.begin(cfg_ssid, cfg_pwd);
   started = true;
-  last_begin = millis();
-  Serial.printf("WIFI: connecting to '%s'\n", cfg_ssid);
+  tryCurrent();
 }
 
 namespace m5wifi {
@@ -57,19 +75,20 @@ namespace m5wifi {
 void begin() {
   Preferences store;
   store.begin("m5wifi", true);
-  String s = store.getString("ssid", "");
-  String p = store.getString("pwd", "");
   bool has_saved = store.isKey("ssid");
+  for (int i = 0; i < WIFI_SLOTS; i++) {
+    String s = store.getString(key_ssid[i], "");
+    String p = store.getString(key_pwd[i], "");
+    strncpy(cfg_ssid[i], s.c_str(), sizeof(cfg_ssid[i]) - 1);
+    strncpy(cfg_pwd[i], p.c_str(), sizeof(cfg_pwd[i]) - 1);
+  }
   store.end();
 
-  strncpy(cfg_ssid, s.c_str(), sizeof(cfg_ssid) - 1);
-  strncpy(cfg_pwd, p.c_str(), sizeof(cfg_pwd) - 1);
-
 #ifdef WIFI_SSID
-  if (!has_saved) {   // build-time defaults, until something is saved from the CLI
-    strncpy(cfg_ssid, WIFI_SSID, sizeof(cfg_ssid) - 1);
+  if (!has_saved) {   // build-time defaults for slot 0, until something is saved from the CLI
+    strncpy(cfg_ssid[0], WIFI_SSID, sizeof(cfg_ssid[0]) - 1);
   #ifdef WIFI_PWD
-    strncpy(cfg_pwd, WIFI_PWD, sizeof(cfg_pwd) - 1);
+    strncpy(cfg_pwd[0], WIFI_PWD, sizeof(cfg_pwd[0]) - 1);
   #endif
   }
 #else
@@ -79,10 +98,11 @@ void begin() {
   WiFi.mode(WIFI_OFF);
 }
 
-bool configured() { return cfg_ssid[0] != 0; }
+bool configured() { return cfg_ssid[0][0] != 0 || cfg_ssid[1][0] != 0; }
 bool connected()  { return started && WiFi.status() == WL_CONNECTED; }
 bool timeSynced() { return time_ok; }
-const char* ssid() { return cfg_ssid; }
+const char* ssid() { return cfg_ssid[cur]; }
+const char* ssid(int slot) { return (slot >= 0 && slot < WIFI_SLOTS) ? cfg_ssid[slot] : ""; }
 int rssi() { return connected() ? WiFi.RSSI() : 0; }
 
 IPAddress localIP() {
@@ -97,21 +117,23 @@ void statusText(char* dest, size_t len) {
   } else if (!connected()) {
     snprintf(dest, len, "connexion...");
   } else {
-    snprintf(dest, len, "%s %ddBm", cfg_ssid, (int)WiFi.RSSI());
+    snprintf(dest, len, "%s %ddBm", cfg_ssid[cur], (int)WiFi.RSSI());
   }
 }
 
-void setSsid(const char* value) {
-  strncpy(cfg_ssid, value, sizeof(cfg_ssid) - 1);
-  cfg_ssid[sizeof(cfg_ssid) - 1] = 0;
-  saveString("ssid", cfg_ssid);
+void setSsid(int slot, const char* value) {
+  if (slot < 0 || slot >= WIFI_SLOTS) return;
+  strncpy(cfg_ssid[slot], value, sizeof(cfg_ssid[slot]) - 1);
+  cfg_ssid[slot][sizeof(cfg_ssid[slot]) - 1] = 0;
+  saveString(key_ssid[slot], cfg_ssid[slot]);
   stopRadio();   // restarted from loop() with the new settings
 }
 
-void setPassword(const char* value) {
-  strncpy(cfg_pwd, value, sizeof(cfg_pwd) - 1);
-  cfg_pwd[sizeof(cfg_pwd) - 1] = 0;
-  saveString("pwd", cfg_pwd);
+void setPassword(int slot, const char* value) {
+  if (slot < 0 || slot >= WIFI_SLOTS) return;
+  strncpy(cfg_pwd[slot], value, sizeof(cfg_pwd[slot]) - 1);
+  cfg_pwd[slot][sizeof(cfg_pwd[slot]) - 1] = 0;
+  saveString(key_pwd[slot], cfg_pwd[slot]);
   stopRadio();
 }
 
@@ -151,10 +173,10 @@ void loop(bool wanted) {
   was_connected = up;
 
   if (!up) {
-    if (now - last_begin > WIFI_RETRY_MS) {
+    if (now - last_begin > WIFI_RETRY_MS) {   // no answer: give the other saved network a chance
       WiFi.disconnect();
-      WiFi.begin(cfg_ssid, cfg_pwd);
-      last_begin = now;
+      cur = nextSlot(cur);
+      tryCurrent();
     }
     return;
   }
@@ -187,9 +209,10 @@ namespace m5wifi {
   IPAddress localIP() { return IPAddress(0, 0, 0, 0); }
   int rssi() { return 0; }
   const char* ssid() { return ""; }
+  const char* ssid(int) { return ""; }
   void statusText(char* dest, size_t len) { snprintf(dest, len, "desactive"); }
-  void setSsid(const char*) {}
-  void setPassword(const char*) {}
+  void setSsid(int, const char*) {}
+  void setPassword(int, const char*) {}
 }
 
 #endif

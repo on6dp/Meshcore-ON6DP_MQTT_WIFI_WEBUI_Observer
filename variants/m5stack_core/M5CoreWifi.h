@@ -13,17 +13,20 @@ namespace m5wifi {
   void begin();                    // loads the credentials saved in NVS
   void loop(bool wanted);          // wanted=false switches the WiFi radio off
 
-  bool configured();               // an SSID has been set
+  // Two networks are remembered (slot 0 and slot 1, e.g. home and phone hotspot).
+  // They are tried in turn until one of them answers.
+  bool configured();               // at least one SSID has been set
   bool connected();
   bool timeSynced();               // clock set from NTP over WiFi at least once
   IPAddress localIP();
   int rssi();
-  const char* ssid();
+  const char* ssid();              // network in use (or being tried)
+  const char* ssid(int slot);      // saved network, "" when the slot is empty
   void statusText(char* dest, size_t len);   // short human-readable state
 
-  // Saved in NVS and applied at once. An empty SSID disables WiFi.
-  void setSsid(const char* ssid);
-  void setPassword(const char* pwd);
+  // Saved in NVS and applied at once. An empty SSID clears the slot.
+  void setSsid(int slot, const char* ssid);
+  void setPassword(int slot, const char* pwd);
 
 #ifdef WITH_M5_WIFI
   Client& client();                // TCP client for the MQTT bridge

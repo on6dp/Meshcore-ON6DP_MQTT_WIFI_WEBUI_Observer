@@ -1292,17 +1292,22 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
       strcpy(reply, "OK - Discover sent");
     }
 #if defined(WITH_M5_WIFI)
-  } else if (memcmp(command, "get wifi.ssid", 13) == 0) {
-    strcpy(reply, m5wifi::configured() ? m5wifi::ssid() : "(none)");
-  } else if (memcmp(command, "set wifi.ssid", 13) == 0) {
-    const char* v = command + 13;
+  // two WiFi networks are remembered: "wifi" (slot 0) and "wifi2" (slot 1)
+  } else if (memcmp(command, "get wifi.ssid", 13) == 0 || memcmp(command, "get wifi2.ssid", 14) == 0) {
+    int slot = (command[8] == '2') ? 1 : 0;
+    const char* v = m5wifi::ssid(slot);
+    strcpy(reply, *v ? v : "(none)");
+  } else if (memcmp(command, "set wifi.ssid", 13) == 0 || memcmp(command, "set wifi2.ssid", 14) == 0) {
+    int slot = (command[8] == '2') ? 1 : 0;
+    const char* v = command + 13 + slot;
     while (*v == ' ') v++;
-    m5wifi::setSsid(v);            // empty value = WiFi disabled
-    strcpy(reply, *v ? "OK" : "OK - WiFi disabled");
-  } else if (memcmp(command, "set wifi.pwd", 12) == 0) {
-    const char* v = command + 12;
+    m5wifi::setSsid(slot, v);      // empty value = network forgotten
+    strcpy(reply, *v ? "OK" : "OK - network removed");
+  } else if (memcmp(command, "set wifi.pwd", 12) == 0 || memcmp(command, "set wifi2.pwd", 13) == 0) {
+    int slot = (command[8] == '2') ? 1 : 0;
+    const char* v = command + 12 + slot;
     while (*v == ' ') v++;
-    m5wifi::setPassword(v);
+    m5wifi::setPassword(slot, v);
     strcpy(reply, "OK");
   } else if (memcmp(command, "get wifi.status", 15) == 0) {
     m5wifi::statusText(reply, 60);
