@@ -237,7 +237,7 @@ void M5CoreUITask::pageStatus() {
   drawRow(3, "Uptime", tmp);
 
   uint32_t now = rtc_clock.getCurrentTime();
-  if (now > 1700000000UL) {
+  if (m5lan::timeSynced() || now > 1790000000UL) {   // NTP done, or set by an admin "clock sync"
     uint32_t t = now % 86400;
     snprintf(tmp, sizeof(tmp), "%02u:%02u:%02u UTC", (unsigned)(t / 3600), (unsigned)((t % 3600) / 60), (unsigned)(t % 60));
     drawRow(4, "Heure", tmp);

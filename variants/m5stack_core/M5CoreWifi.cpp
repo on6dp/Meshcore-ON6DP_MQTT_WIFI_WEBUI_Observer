@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include <Preferences.h>
 #include <time.h>
+#include <esp_sntp.h>
 #include <helpers/AutoDiscoverRTCClock.h>
 
 extern AutoDiscoverRTCClock rtc_clock;
@@ -14,7 +15,6 @@ extern AutoDiscoverRTCClock rtc_clock;
 #endif
 #define WIFI_RETRY_MS      12000   // time given to one network before the other one is tried
 #define WIFI_SLOTS         2
-#define NTP_RESYNC_MS      (6UL * 60 * 60 * 1000)
 
 static char     cfg_ssid[WIFI_SLOTS][33] = { "", "" };
 static char     cfg_pwd[WIFI_SLOTS][65] = { "", "" };
@@ -24,10 +24,13 @@ static int      cur = 0;                 // slot in use / being tried
 static bool     started = false;
 static bool     was_connected = false;
 static bool     time_ok = false;
-static bool     waiting_ntp = false;
+static volatile bool sntp_done = false;   // set by the SNTP task when a server has answered
 static uint32_t last_begin = 0;
 static uint32_t next_check = 0;
-static uint32_t last_sync = 0;
+
+static void onSntpSync(struct timeval*) {
+  sntp_done = true;
+}
 
 static void saveString(const char* key, const char* value) {
   Preferences store;
@@ -42,7 +45,6 @@ static void stopRadio() {
   WiFi.mode(WIFI_OFF);
   started = false;
   was_connected = false;
-  waiting_ntp = false;
 }
 
 // Next slot that holds a network, starting after 'from' (returns 'from' when it is the only one).
@@ -165,8 +167,9 @@ void loop(bool wanted) {
   if (up && !was_connected) {
     IPAddress ip = WiFi.localIP();
     Serial.printf("WIFI: connected, IP %u.%u.%u.%u, RSSI %d\n", ip[0], ip[1], ip[2], ip[3], (int)WiFi.RSSI());
-    configTime(0, 0, NTP_SERVER);   // SNTP in the background, UTC
-    waiting_ntp = true;
+    sntp_done = false;
+    sntp_set_time_sync_notification_cb(onSntpSync);
+    configTime(0, 0, NTP_SERVER);   // SNTP in the background (UTC), repeated by the system every hour
   } else if (!up && was_connected) {
     Serial.println("WIFI: connection lost");
   }
@@ -181,18 +184,12 @@ void loop(bool wanted) {
     return;
   }
 
-  if (!waiting_ntp && time_ok && now - last_sync > NTP_RESYNC_MS) {
-    waiting_ntp = true;   // SNTP keeps the system clock fresh; copy it over again
-  }
-  if (waiting_ntp) {
+  if (sntp_done) {   // a real answer from the NTP server (the system clock alone proves nothing)
+    sntp_done = false;
     time_t t = time(nullptr);
-    if (t > 1700000000) {
-      rtc_clock.setCurrentTime((uint32_t)t);
-      time_ok = true;
-      waiting_ntp = false;
-      last_sync = now;
-      Serial.printf("NTP: clock set over WiFi, epoch=%u\n", (unsigned)t);
-    }
+    rtc_clock.setCurrentTime((uint32_t)t);
+    if (!time_ok) Serial.printf("NTP: clock set over WiFi, epoch=%u\n", (unsigned)t);
+    time_ok = true;
   }
 }
 
