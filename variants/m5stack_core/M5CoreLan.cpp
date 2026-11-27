@@ -38,6 +38,7 @@ static bool     time_ok = false;
 static uint32_t next_link_check = 0;
 static uint32_t next_ip_attempt = 0;
 static uint32_t next_ntp_at = 0;
+static uint32_t next_detect_at = 0;
 
 // NTP exchange in progress
 static EthernetUDP ntp_udp;
@@ -77,14 +78,22 @@ const char* statusText() {
   return "connecte";
 }
 
+// Probes the W5500. hardwareStatus() only reports the result of the chip
+// detection; the detection itself is run by linkStatus() (or by begin()).
+static bool detectChip() {
+  Ethernet.linkStatus();
+  return Ethernet.hardwareStatus() != EthernetNoHardware;
+}
+
 void begin() {
   esp_read_mac(mac, ESP_MAC_ETH);   // unique, derived from the ESP32 factory MAC
 
   // the reset pulse was already done by M5CoreBoard::begin()
   Ethernet.init(P_ETH_CS);
-  hw_ok = (Ethernet.hardwareStatus() != EthernetNoHardware);
+  hw_ok = detectChip();
   if (!hw_ok) {
     Serial.printf("ETH: no W5500 found (CS=%d) - check the jumper caps of the LAN module\n", P_ETH_CS);
+    next_detect_at = millis() + 5000;
     return;
   }
   Serial.printf("ETH: W5500 found, MAC %02X:%02X:%02X:%02X:%02X:%02X\n",
@@ -170,8 +179,15 @@ static void ntpPoll() {
 }
 
 void loop() {
-  if (!hw_ok) return;
   uint32_t now = millis();
+
+  if (!hw_ok) {   // keep probing: the module may answer late after power-up
+    if ((int32_t)(now - next_detect_at) < 0) return;
+    next_detect_at = now + 5000;
+    hw_ok = detectChip();
+    if (!hw_ok) return;
+    Serial.println("ETH: W5500 found");
+  }
 
   if ((int32_t)(now - next_link_check) >= 0) {
     next_link_check = now + 1000;

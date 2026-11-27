@@ -29,7 +29,7 @@ extern MyMesh the_mesh;
 // ---- colours (RGB565) ----
 #define COL_GREEN              0x07E0
 #define COL_RED                0xF800
-#define COL_BTN                0x2945   // dark grey-blue
+#define COL_BTN                0x212A   // dark blue (a colour the 8-bit frame buffer renders exactly)
 
 static const uint8_t brightness_steps[] = { 160, 50 };
 
